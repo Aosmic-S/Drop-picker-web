@@ -1,11 +1,15 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+// Default Supabase project connection provided for real dataset synchronization
+const DEFAULT_SUPABASE_URL = 'https://pvvscrgxcylithvaajip.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2dnNjcmd4Y3lsaXRodmFhamlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3MTEyNTMsImV4cCI6MjEwMjI4NzI1M30.TUHdUVTphvKuE3lvsuQmQRQPFBIYDifYOsR3RLVoPmg';
+
 // Safe retrieval of environment variables or local storage configuration
 const metaEnv = (import.meta as unknown as { env?: Record<string, string | undefined> }).env || {};
 
 export function getSupabaseCredentials(): { url: string; anonKey: string } {
-  let url = metaEnv.VITE_SUPABASE_URL || '';
-  let anonKey = metaEnv.VITE_SUPABASE_ANON_KEY || '';
+  let url = metaEnv.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  let anonKey = metaEnv.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
   if (typeof window !== 'undefined') {
     const customUrl = localStorage.getItem('drop_picker_supabase_url');

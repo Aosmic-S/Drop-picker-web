@@ -1,5 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from './supabase';
-import { Product, WatchlistItem, PriceAlert, RestockAlert, Notification, LiveDropEvent } from '../types';
+import { Product, ProductCategory, StockStatus, WatchlistItem, PriceAlert, RestockAlert, Notification, LiveDropEvent } from '../types';
 
 export interface UserAuthProfile {
   id: string;
@@ -59,38 +59,100 @@ export async function testSupabaseConnection(): Promise<{
   }
 }
 
+function mapSupabaseRowToProduct(row: any): Product {
+  const currentPrice = Number(row.current_price ?? row.price ?? row.final_price ?? row.sale_price ?? row.amount ?? 0);
+  const rawOrigPrice = row.original_price ?? row.list_price ?? row.regular_price ?? row.msrp ?? row.previous_price;
+  const originalPrice = rawOrigPrice && Number(rawOrigPrice) > currentPrice ? Number(rawOrigPrice) : undefined;
+  const lowestPrice = Number(row.lowest_price ?? row.min_price ?? (currentPrice > 0 ? currentPrice : 0));
+  const highestPrice = Number(row.highest_price ?? row.max_price ?? (originalPrice || currentPrice));
+  const averagePrice = Number(row.average_price ?? row.avg_price ?? currentPrice);
+  
+  let stockStatus: StockStatus = 'In Stock';
+  const rawStatus = String(row.stock_status || '').toLowerCase();
+  if (rawStatus.includes('out') || row.in_stock === false || row.stock === 0 || row.availability === 'out_of_stock') {
+    stockStatus = 'Out of Stock';
+  } else if (rawStatus.includes('limit')) {
+    stockStatus = 'Limited';
+  } else if (rawStatus.includes('pre')) {
+    stockStatus = 'Pre-order';
+  } else {
+    stockStatus = 'In Stock';
+  }
+
+  const rawStore = String(row.store || row.retailer || row.vendor || row.source || 'Best Buy');
+  let store: 'Best Buy' | 'Newegg' | 'Steam' | string = 'Best Buy';
+  if (rawStore.toLowerCase().includes('newegg')) store = 'Newegg';
+  else if (rawStore.toLowerCase().includes('steam')) store = 'Steam';
+  else if (rawStore.toLowerCase().includes('best buy') || rawStore.toLowerCase().includes('bestbuy')) store = 'Best Buy';
+  else store = rawStore;
+
+  const defaultImg = 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&q=80&w=400';
+  const image = row.image || row.image_url || row.img_url || row.thumbnail || row.picture || defaultImg;
+
+  let category: ProductCategory = 'pc_hardware';
+  const rawCat = String(row.category || '').toLowerCase();
+  if (rawCat.includes('console')) category = 'console';
+  else if (rawCat.includes('game')) category = 'game';
+  else if (rawCat.includes('accessory')) category = 'accessory';
+  else category = 'pc_hardware';
+
+  return {
+    id: String(row.id || row._id || `prod_${Math.random().toString(36).slice(2, 9)}`),
+    name: String(row.name || row.title || row.product_name || 'Hardware Product'),
+    brand: String(row.brand || row.manufacturer || 'Tech'),
+    category,
+    subCategory: row.sub_category || row.subcategory,
+    image,
+    currentPrice,
+    originalPrice,
+    lowestPrice,
+    averagePrice,
+    highestPrice,
+    dealScore: Number(row.deal_score ?? (originalPrice ? Math.min(99, Math.round(((originalPrice - currentPrice) / originalPrice) * 100) + 50) : 75)),
+    stockStatus,
+    store,
+    specs: typeof row.specs === 'object' && row.specs !== null ? row.specs : {},
+    allStores: Array.isArray(row.all_stores) && row.all_stores.length > 0 ? row.all_stores : [
+      {
+        store,
+        price: currentPrice,
+        stockStatus,
+        url: row.url || row.product_url || row.link || '#'
+      }
+    ],
+    updatedAt: row.updated_at ? new Date(row.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently',
+  };
+}
+
 // 2. Products Sync
 export async function fetchProductsFromSupabase(): Promise<Product[] | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
 
   try {
-    const { data, error } = await supabase.from('products').select('*').order('updated_at', { ascending: false });
-    if (error) {
-      console.warn('Supabase products fetch warning:', error.message);
-      return null;
+    // 1. Try standard 'products' table
+    const { data, error } = await supabase.from('products').select('*');
+    if (!error && data && data.length > 0) {
+      return data.map(mapSupabaseRowToProduct);
     }
 
-    if (data && data.length > 0) {
-      return data.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        brand: row.brand,
-        category: row.category,
-        subCategory: row.sub_category,
-        image: row.image,
-        currentPrice: Number(row.current_price),
-        originalPrice: row.original_price ? Number(row.original_price) : undefined,
-        lowestPrice: Number(row.lowest_price),
-        averagePrice: Number(row.average_price),
-        highestPrice: Number(row.highest_price),
-        dealScore: row.deal_score ?? 70,
-        stockStatus: row.stock_status || 'In Stock',
-        store: row.store || 'Amazon',
-        specs: row.specs || {},
-        allStores: row.all_stores || [],
-        updatedAt: row.updated_at ? new Date(row.updated_at).toLocaleTimeString() : 'Recently',
-      }));
+    // 2. If 'products' is empty or error, check fallback table names
+    if (error && error.code === '42P01') {
+      const fallbacks = ['product', 'items', 'hardware_products', 'items_tracked'];
+      for (const tbl of fallbacks) {
+        const { data: fallbackData, error: fallbackError } = await supabase.from(tbl).select('*');
+        if (!fallbackError && fallbackData && fallbackData.length > 0) {
+          return fallbackData.map(mapSupabaseRowToProduct);
+        }
+      }
+    }
+
+    if (data && data.length === 0) {
+      return [];
+    }
+
+    if (error) {
+      console.warn('Supabase products query notification:', error.message);
     }
 
     return [];

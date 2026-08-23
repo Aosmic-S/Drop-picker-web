@@ -10,12 +10,13 @@ export function KPICards() {
   const totalDeals = products.filter(p => p.originalPrice && p.currentPrice < p.originalPrice).length;
   const inStockCount = products.filter(p => p.stockStatus === 'In Stock').length;
   const activeAlertsCount = priceAlerts.filter(a => a.status === 'active').length;
+  const dropsCount = liveDrops.filter(d => d.type === 'drop').length;
 
   const kpis = [
     { 
       label: 'Price Drops', 
-      value: `${liveDrops.filter(d => d.type === 'drop').length + 24}`, 
-      change: '+18.4% today', 
+      value: `${dropsCount}`, 
+      change: dropsCount > 0 ? `${dropsCount} verified drops` : 'Listening to feed', 
       trend: 'up', 
       icon: TrendingDown, 
       color: 'text-emerald-400',
@@ -23,8 +24,8 @@ export function KPICards() {
     },
     { 
       label: 'Live Restocks', 
-      value: `${inStockCount + 48}`, 
-      change: '+14 new', 
+      value: `${inStockCount}`, 
+      change: inStockCount > 0 ? `${inStockCount} in stock` : '0 in stock', 
       trend: 'up', 
       icon: RefreshCcw, 
       color: 'text-blue-400',
@@ -32,8 +33,8 @@ export function KPICards() {
     },
     { 
       label: 'Active Deals', 
-      value: `${totalDeals + 380}`, 
-      change: '+34 curated', 
+      value: `${totalDeals}`, 
+      change: totalDeals > 0 ? `${totalDeals} discounted` : '0 active', 
       trend: 'up', 
       icon: Tag, 
       color: 'text-emerald-500',
@@ -49,9 +50,9 @@ export function KPICards() {
       path: '/watchlist'
     },
     { 
-      label: 'Tracked Hardware', 
-      value: `${products.length + 4820}`, 
-      change: '+127 updated', 
+      label: 'Tracked Products', 
+      value: `${products.length}`, 
+      change: `${products.length} live items`, 
       trend: 'up', 
       icon: Package, 
       color: 'text-gray-400',
@@ -60,7 +61,7 @@ export function KPICards() {
     { 
       label: 'Active Alerts', 
       value: `${activeAlertsCount}`, 
-      change: 'Realtime trigger', 
+      change: activeAlertsCount > 0 ? `${activeAlertsCount} active` : 'None active', 
       trend: 'up', 
       icon: BellRing, 
       color: 'text-amber-400',

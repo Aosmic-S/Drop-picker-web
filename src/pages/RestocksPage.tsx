@@ -23,6 +23,13 @@ export function RestocksPage() {
     return true;
   });
 
+  const uniqueStores = new Set<string>();
+  products.forEach(p => {
+    if (p.store) uniqueStores.add(p.store);
+    p.allStores?.forEach(s => uniqueStores.add(s.storeName));
+  });
+  const storeCount = uniqueStores.size || 5;
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -43,7 +50,7 @@ export function RestocksPage() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 bg-[#0D0F12] border border-gray-800 rounded-lg p-1.5 px-3 text-xs text-gray-300">
             <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-            <span>48 Stores Polled</span>
+            <span>{storeCount} Stores Polled</span>
           </div>
         </div>
       </div>
@@ -108,81 +115,91 @@ export function RestocksPage() {
       </Card>
 
       {/* Grid of Stock Items */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map(product => {
-          const inStock = product.stockStatus === 'In Stock';
-          const isLimited = product.stockStatus === 'Limited';
+      {filtered.length === 0 ? (
+        <Card className="bg-[#0D0F12] border-gray-800 p-12 text-center">
+          <RefreshCcw className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+          <h3 className="text-base font-semibold text-gray-300">No stock records found</h3>
+          <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+            No items currently match your stock and category filter. Try clearing filters or scraping additional store links.
+          </p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map(product => {
+            const inStock = product.stockStatus === 'In Stock';
+            const isLimited = product.stockStatus === 'Limited';
 
-          return (
-            <Card key={product.id} className="bg-[#0D0F12] border-gray-800 hover:border-gray-700 flex flex-col justify-between p-5 transition-all group">
-              <div>
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <Badge variant={getStockBadgeVariant(product.stockStatus)} className="uppercase font-mono text-[10px]">
-                    {product.stockStatus}
-                  </Badge>
-                  <span className="text-[11px] text-gray-500 flex items-center gap-1 font-mono">
-                    <Store className="h-3.5 w-3.5" />
-                    {product.store}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-16 w-16 shrink-0 rounded-lg bg-[#171A20] border border-gray-800 p-1 flex items-center justify-center">
-                    <img src={product.image} alt={product.name} className="h-full w-full object-contain group-hover:scale-105 transition-transform" />
+            return (
+              <Card key={product.id} className="bg-[#0D0F12] border-gray-800 hover:border-gray-700 flex flex-col justify-between p-5 transition-all group">
+                <div>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <Badge variant={getStockBadgeVariant(product.stockStatus)} className="uppercase font-mono text-[10px]">
+                      {product.stockStatus}
+                    </Badge>
+                    <span className="text-[11px] text-gray-500 flex items-center gap-1 font-mono">
+                      <Store className="h-3.5 w-3.5" />
+                      {product.store}
+                    </span>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">{product.brand}</span>
-                    <Link to={`/product/${product.id}`}>
-                      <h3 className="text-sm font-semibold text-gray-100 truncate group-hover:text-blue-400 transition-colors">
-                        {product.name}
-                      </h3>
-                    </Link>
-                    <div className="text-base font-bold font-mono text-gray-100 mt-1">
-                      {formatCurrency(product.currentPrice, settings.currency)}
+
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-16 w-16 shrink-0 rounded-lg bg-[#171A20] border border-gray-800 p-1 flex items-center justify-center">
+                      <img src={product.image} alt={product.name} className="h-full w-full object-contain group-hover:scale-105 transition-transform" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">{product.brand}</span>
+                      <Link to={`/product/${product.id}`}>
+                        <h3 className="text-sm font-semibold text-gray-100 truncate group-hover:text-blue-400 transition-colors">
+                          {product.name}
+                        </h3>
+                      </Link>
+                      <div className="text-base font-bold font-mono text-gray-100 mt-1">
+                        {formatCurrency(product.currentPrice, settings.currency)}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Retailer Availability Pill Row */}
-                {product.allStores && product.allStores.length > 0 && (
-                  <div className="space-y-1.5 my-3 pt-3 border-t border-gray-800/60">
-                    <div className="text-[11px] font-semibold text-gray-400">Retailer Breakdown:</div>
-                    <div className="space-y-1">
-                      {product.allStores.slice(0, 3).map(store => (
-                        <div key={store.storeName} className="flex items-center justify-between text-xs p-1.5 rounded bg-[#12151A]">
-                          <span className="text-gray-300">{store.storeName}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-gray-200">{formatCurrency(store.price, settings.currency)}</span>
-                            <span className={`text-[10px] font-mono uppercase ${store.stock === 'In Stock' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                              {store.stock}
-                            </span>
+                  {/* Retailer Availability Pill Row */}
+                  {product.allStores && product.allStores.length > 0 && (
+                    <div className="space-y-1.5 my-3 pt-3 border-t border-gray-800/60">
+                      <div className="text-[11px] font-semibold text-gray-400">Retailer Breakdown:</div>
+                      <div className="space-y-1">
+                        {product.allStores.slice(0, 3).map(store => (
+                          <div key={store.storeName} className="flex items-center justify-between text-xs p-1.5 rounded bg-[#12151A]">
+                            <span className="text-gray-300">{store.storeName}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-gray-200">{formatCurrency(store.price, settings.currency)}</span>
+                              <span className={`text-[10px] font-mono uppercase ${store.stock === 'In Stock' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                {store.stock}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
 
-              <div className="flex items-center gap-2 pt-3 border-t border-gray-800/60 mt-2">
-                <Button
-                  onClick={() => setActiveAlertModalProduct(product)}
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 text-xs"
-                >
-                  <BellRing className="mr-1.5 h-3.5 w-3.5 text-blue-400" /> Restock Alert
-                </Button>
-                <Link to={`/product/${product.id}`} className="flex-1">
-                  <Button size="sm" className="w-full text-xs bg-gray-800 hover:bg-gray-700 text-gray-200">
-                    View Stores
+                <div className="flex items-center gap-2 pt-3 border-t border-gray-800/60 mt-2">
+                  <Button
+                    onClick={() => setActiveAlertModalProduct(product)}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs"
+                  >
+                    <BellRing className="mr-1.5 h-3.5 w-3.5 text-blue-400" /> Restock Alert
                   </Button>
-                </Link>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+                  <Link to={`/product/${product.id}`} className="flex-1">
+                    <Button size="sm" className="w-full text-xs bg-gray-800 hover:bg-gray-700 text-gray-200">
+                      View Stores
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

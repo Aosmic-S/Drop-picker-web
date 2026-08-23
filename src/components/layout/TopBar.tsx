@@ -5,22 +5,20 @@ import {
   Bell, 
   Bookmark, 
   User, 
-  TrendingDown, 
-  Check, 
-  Trash2, 
-  ExternalLink,
-  ChevronDown,
-  Zap,
-  Menu,
-  X
+  ChevronDown, 
+  Menu, 
+  Palette,
+  Sparkles,
+  Check,
+  Trash2
 } from 'lucide-react';
 import { useApp } from '@/src/context/AppContext';
-import { Currency } from '@/src/types';
-import { formatCurrency } from '@/src/lib/utils';
+import { Currency, ThemeType } from '@/src/types';
 
 export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const { 
     setIsCommandOpen, 
+    setIsScrapeModalOpen,
     watchlist, 
     notifications, 
     markNotificationAsRead, 
@@ -28,14 +26,16 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
     clearNotifications,
     settings, 
     setCurrency, 
-    lastUpdatedTime,
-    triggerLiveDropSimulation 
+    updateSettings,
+    lastUpdatedTime
   } = useApp();
 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
+  const [isThemeOpen, setIsThemeOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const currencyRef = useRef<HTMLDivElement>(null);
+  const themeRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -47,6 +47,9 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
       }
       if (currencyRef.current && !currencyRef.current.contains(e.target as Node)) {
         setIsCurrencyOpen(false);
+      }
+      if (themeRef.current && !themeRef.current.contains(e.target as Node)) {
+        setIsThemeOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -60,13 +63,22 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
     { code: 'GBP', label: 'GBP (£)', symbol: '£' },
   ];
 
+  const themes: { id: ThemeType; name: string; dotColor: string }[] = [
+    { id: 'obsidian', name: 'Obsidian', dotColor: 'bg-emerald-500' },
+    { id: 'oled', name: 'Midnight OLED', dotColor: 'bg-sky-400' },
+    { id: 'cyberpunk', name: 'Cyberpunk', dotColor: 'bg-cyan-400' },
+    { id: 'slate', name: 'Slate Steel', dotColor: 'bg-indigo-400' },
+    { id: 'ember', name: 'Ember Stealth', dotColor: 'bg-orange-500' },
+    { id: 'light', name: 'Minimal Light', dotColor: 'bg-gray-300' },
+  ];
+
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-gray-800 bg-[#08090B]/90 px-4 backdrop-blur-md sm:px-6">
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-gray-800 bg-[#08090B]/95 px-3 sm:px-6 backdrop-blur-md gap-2">
+      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 max-w-xl">
         {/* Mobile menu button */}
         <button
           onClick={onToggleSidebar}
-          className="p-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-gray-800 md:hidden"
+          className="p-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-gray-800 md:hidden shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
           aria-label="Toggle navigation"
         >
           <Menu className="h-5 w-5" />
@@ -75,37 +87,47 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
         {/* Global Search trigger */}
         <button
           onClick={() => setIsCommandOpen(true)}
-          className="flex items-center gap-3 rounded-lg border border-gray-800 bg-[#12151A] px-3.5 py-1.5 text-xs text-gray-400 hover:border-gray-700 hover:text-gray-200 transition-colors w-64 sm:w-80 md:w-96 text-left group"
+          className="flex items-center gap-2 sm:gap-3 rounded-lg border border-gray-800 bg-[#12151A] px-3 py-1.5 text-xs text-gray-400 hover:border-gray-700 hover:text-gray-200 transition-colors flex-1 min-w-0 text-left group min-h-[38px]"
         >
-          <Search className="h-4 w-4 text-gray-500 group-hover:text-gray-300 transition-colors" />
-          <span className="truncate">Search products, games, consoles, brands...</span>
-          <kbd className="ml-auto hidden items-center gap-0.5 rounded border border-gray-700 bg-[#171A20] px-1.5 font-mono text-[10px] text-gray-400 sm:flex">
+          <Search className="h-4 w-4 text-gray-500 group-hover:text-gray-300 transition-colors shrink-0" />
+          <span className="truncate hidden sm:inline">Search products, games, consoles, hardware...</span>
+          <span className="truncate sm:hidden">Search...</span>
+          <kbd className="ml-auto hidden items-center gap-0.5 rounded border border-gray-700 bg-[#171A20] px-1.5 font-mono text-[10px] text-gray-400 sm:flex shrink-0">
             <span>⌘</span>K
           </kbd>
+        </button>
+
+        {/* Scrape URL Button */}
+        <button
+          onClick={() => setIsScrapeModalOpen(true)}
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50 text-xs font-semibold transition-all shrink-0 min-h-[38px]"
+          title="Scrape & Track any live product URL with Bright Data"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Scrape URL</span>
         </button>
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-3 sm:gap-4">
-        {/* Live Simulator & Status */}
-        <button
-          onClick={triggerLiveDropSimulation}
-          title="Click to simulate an instant live drop/restock event"
-          className="hidden items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1 text-xs text-gray-300 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-colors lg:flex"
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        {/* Live Status (hidden on small mobile) */}
+        <div
+          title="Scraper daemon is active and monitoring live drops"
+          className="hidden items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1 text-xs text-gray-300 lg:flex"
         >
           <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)] animate-pulse" />
-          <span className="font-semibold text-emerald-400 tracking-wider text-[11px]">LIVE</span>
-          <span className="text-[10px] text-gray-500">• Updated {lastUpdatedTime}</span>
-        </button>
+          <span className="font-semibold text-emerald-400 tracking-wider text-[10px]">LIVE</span>
+          <span className="text-[10px] text-gray-500">• {lastUpdatedTime}</span>
+        </div>
 
         {/* Currency Switcher */}
         <div className="relative" ref={currencyRef}>
           <button
             onClick={() => setIsCurrencyOpen(!isCurrencyOpen)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-800 bg-[#12151A] text-xs font-mono font-medium text-gray-300 hover:border-gray-700 transition-colors"
+            className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg border border-gray-800 bg-[#12151A] text-xs font-mono font-medium text-gray-300 hover:border-gray-700 transition-colors min-h-[36px]"
           >
             <span>{settings.currency}</span>
-            <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+            <ChevronDown className="h-3 w-3 text-gray-500" />
           </button>
 
           {isCurrencyOpen && (
@@ -117,7 +139,7 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
                     setCurrency(c.code);
                     setIsCurrencyOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors ${
+                  className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors min-h-[36px] ${
                     settings.currency === c.code ? 'bg-gray-800 text-emerald-400 font-semibold' : 'text-gray-300 hover:bg-[#171A20]'
                   }`}
                 >
@@ -129,15 +151,54 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
           )}
         </div>
 
-        {/* Watchlist Icon Button */}
+        {/* Theme Switcher */}
+        <div className="relative hidden sm:block" ref={themeRef}>
+          <button
+            onClick={() => setIsThemeOpen(!isThemeOpen)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-gray-800 bg-[#12151A] text-xs font-mono font-medium text-gray-300 hover:border-gray-700 transition-colors min-h-[36px]"
+            title="Switch Theme"
+          >
+            <Palette className="h-3.5 w-3.5 text-gray-400" />
+            <span className="capitalize hidden md:inline">{settings.theme || 'obsidian'}</span>
+            <ChevronDown className="h-3 w-3 text-gray-500" />
+          </button>
+
+          {isThemeOpen && (
+            <div className="absolute right-0 mt-2 w-44 rounded-xl border border-gray-800 bg-[#0D0F12] py-1 shadow-2xl z-50">
+              <div className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-gray-500 font-bold border-b border-gray-800/80 mb-1">
+                Visual Themes
+              </div>
+              {themes.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    updateSettings({ theme: t.id });
+                    setIsThemeOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors min-h-[36px] ${
+                    (settings.theme || 'obsidian') === t.id ? 'bg-gray-800 text-emerald-400 font-semibold' : 'text-gray-300 hover:bg-[#171A20]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${t.dotColor}`} />
+                    <span>{t.name}</span>
+                  </div>
+                  {(settings.theme || 'obsidian') === t.id && <Check className="h-3.5 w-3.5" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Watchlist Icon Button (Desktop) */}
         <Link
           to="/watchlist"
-          className="relative p-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-gray-800/60 transition-colors"
+          className="relative p-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-gray-800/60 transition-colors hidden sm:flex items-center justify-center min-h-[36px] min-w-[36px]"
           title="Watchlist"
         >
-          <Bookmark className="h-5 w-5" />
+          <Bookmark className="h-4 w-4" />
           {watchlist.length > 0 && (
-            <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-[9px] font-mono font-bold text-gray-200">
+            <span className="absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-mono font-bold text-black">
               {watchlist.length}
             </span>
           )}
@@ -147,7 +208,7 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => setIsNotifOpen(!isNotifOpen)}
-            className="relative p-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-gray-800/60 transition-colors"
+            className="relative p-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-gray-800/60 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
             title="Notifications"
           >
             <Bell className="h-5 w-5" />
@@ -159,7 +220,7 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
           </button>
 
           {isNotifOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl border border-gray-800 bg-[#0D0F12] shadow-2xl z-50 overflow-hidden flex flex-col max-h-[480px]">
+            <div className="fixed sm:absolute right-2 sm:right-0 top-16 sm:top-full mt-1 w-[calc(100vw-1rem)] sm:w-96 rounded-xl border border-gray-800 bg-[#0D0F12] shadow-2xl z-50 overflow-hidden flex flex-col max-h-[75vh]">
               <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3 bg-[#12151A]">
                 <div className="flex items-center gap-2">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-200">Notifications</h4>
@@ -172,13 +233,13 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={markAllNotificationsAsRead}
-                    className="text-[11px] text-gray-400 hover:text-gray-200 transition-colors"
+                    className="text-[11px] text-gray-400 hover:text-gray-200 transition-colors min-h-[32px] px-1"
                   >
                     Mark read
                   </button>
                   <button
                     onClick={clearNotifications}
-                    className="text-[11px] text-gray-500 hover:text-rose-400 transition-colors p-1"
+                    className="text-[11px] text-gray-500 hover:text-rose-400 transition-colors p-1.5 min-h-[32px]"
                     title="Clear all"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -219,11 +280,11 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
                 )}
               </div>
 
-              <div className="border-t border-gray-800 p-2 bg-[#08090B] text-center">
+              <div className="border-t border-gray-800 p-2.5 bg-[#08090B] text-center">
                 <Link
                   to="/notifications"
                   onClick={() => setIsNotifOpen(false)}
-                  className="text-xs text-emerald-400 hover:underline block py-1"
+                  className="text-xs text-emerald-400 hover:underline block py-1 font-medium"
                 >
                   View All Notifications in Center →
                 </Link>
@@ -235,7 +296,7 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
         {/* User profile / Avatar */}
         <Link
           to="/profile"
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-800 border border-gray-700 text-gray-300 hover:text-gray-100 hover:border-gray-500 transition-colors"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-800 border border-gray-700 text-gray-300 hover:text-gray-100 hover:border-gray-500 transition-colors shrink-0"
           title="Account & Settings"
         >
           <User className="h-4 w-4" />

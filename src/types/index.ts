@@ -174,10 +174,12 @@ export interface Notification {
 
 export type Currency = 'INR' | 'USD' | 'EUR' | 'GBP';
 
+export type ThemeType = 'obsidian' | 'oled' | 'cyberpunk' | 'slate' | 'ember' | 'light';
+
 export interface UserSettings {
   currency: Currency;
   region: string;
-  theme: 'dark';
+  theme: ThemeType;
   enableAudioAlerts: boolean;
   liveFeedRefreshRate: number; // in seconds
   alertChannels: {
@@ -186,3 +188,4 @@ export interface UserSettings {
     browser: boolean;
   };
 }
+

@@ -9,14 +9,38 @@ import {
   Currency, 
   UserSettings 
 } from '../types';
+import { INITIAL_PRODUCTS } from '../data/initialCatalog';
 import { 
-  mockProducts, 
-  mockLiveDrops, 
-  mockWatchlist, 
-  mockPriceAlerts, 
-  mockRestockAlerts, 
-  mockNotifications 
-} from '../lib/mockData';
+  isSupabaseConfigured,
+  getSupabase,
+} from '../lib/supabase';
+import {
+  fetchProductsFromSupabase,
+  updateProductPriceInSupabase,
+  fetchWatchlistFromSupabase,
+  syncWatchlistItemToSupabase,
+  removeWatchlistItemFromSupabase,
+  fetchPriceAlertsFromSupabase,
+  syncPriceAlertToSupabase,
+  deleteAlertFromSupabase,
+  createProductInSupabase,
+  deleteProductFromSupabase,
+  subscribeToSupabaseRealtime,
+  getSupabaseUser,
+  signInWithEmail,
+  signUpWithEmail,
+  signOutSupabase,
+  UserAuthProfile
+} from '../lib/supabaseService';
+import { 
+  scrapeUrlWithBrightData, 
+  ScrapedProductData 
+} from '../lib/brightDataService';
+import { 
+  triggerLiveScraper, 
+  getBackendApiUrl,
+  ScrapeJobResult
+} from '../lib/backendService';
 
 interface Toast {
   id: string;
@@ -35,8 +59,11 @@ interface AppContextType {
   settings: UserSettings;
   toasts: Toast[];
   isCommandOpen: boolean;
+  isScrapeModalOpen: boolean;
   activeAlertModalProduct: Product | null;
   lastUpdatedTime: string;
+  currentUser: UserAuthProfile | null;
+  isSupabaseActive: boolean;
   
   // Actions
   setCurrency: (currency: Currency) => void;
@@ -58,15 +85,26 @@ interface AppContextType {
   clearNotifications: () => void;
   
   setIsCommandOpen: (open: boolean) => void;
+  setIsScrapeModalOpen: (open: boolean) => void;
   setActiveAlertModalProduct: (product: Product | null) => void;
-  triggerLiveDropSimulation: () => void;
   addToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
+  
+  // API Integration Actions
+  scrapeAndTrackUrl: (url: string) => Promise<{ success: boolean; product?: ScrapedProductData; message: string }>;
+  triggerBackendScrapeJob: (store?: string, category?: string) => Promise<{ success: boolean; job?: ScrapeJobResult; message: string }>;
+  
+  // Supabase Auth & Sync
+  loginWithSupabase: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  registerWithSupabase: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  logoutSupabase: () => Promise<void>;
+  syncWithSupabaseDatabase: () => Promise<void>;
   
   // Admin & Modifiers
   adminUpdateProductPrice: (productId: string, newPrice: number, store?: string) => void;
   adminUpdateStock: (productId: string, status: Product['stockStatus']) => void;
   adminAddProduct: (product: Product) => void;
+  adminDeleteProduct: (productId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -74,40 +112,87 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('drop_picker_products');
-    return saved ? JSON.parse(saved) : mockProducts;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Error parsing stored products', e);
+      }
+    }
+    return INITIAL_PRODUCTS;
   });
 
   const [liveDrops, setLiveDrops] = useState<LiveDropEvent[]>(() => {
     const saved = localStorage.getItem('drop_picker_live_drops');
-    return saved ? JSON.parse(saved) : mockLiveDrops;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Error parsing stored drops', e);
+      }
+    }
+    return INITIAL_PRODUCTS.filter(p => p.originalPrice && p.currentPrice < p.originalPrice).map((p, idx) => {
+      const oldPrice = p.originalPrice!;
+      const newPrice = p.currentPrice;
+      const diff = newPrice - oldPrice;
+      const pct = (diff / oldPrice) * 100;
+      return {
+        id: `drop_init_${p.id}_${idx}`,
+        product: p,
+        oldPrice,
+        newPrice,
+        percentageChange: Number(pct.toFixed(1)),
+        timestamp: p.updatedAt || 'Recent',
+        store: p.store,
+        type: 'drop' as const
+      };
+    });
   });
 
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => {
     const saved = localStorage.getItem('drop_picker_watchlist');
-    return saved ? JSON.parse(saved) : mockWatchlist;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>(() => {
     const saved = localStorage.getItem('drop_picker_price_alerts');
-    return saved ? JSON.parse(saved) : mockPriceAlerts;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [restockAlerts, setRestockAlerts] = useState<RestockAlert[]>(() => {
     const saved = localStorage.getItem('drop_picker_restock_alerts');
-    return saved ? JSON.parse(saved) : mockRestockAlerts;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [notifications, setNotifications] = useState<Notification[]>(() => {
     const saved = localStorage.getItem('drop_picker_notifications');
-    return saved ? JSON.parse(saved) : mockNotifications;
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [currentUser, setCurrentUser] = useState<UserAuthProfile | null>(() => {
+    const saved = localStorage.getItem('drop_picker_auth_user');
+    return saved ? JSON.parse(saved) : null;
   });
 
   const [settings, setSettings] = useState<UserSettings>(() => {
     const saved = localStorage.getItem('drop_picker_settings');
-    return saved ? JSON.parse(saved) : {
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.theme === 'dark') {
+        parsed.theme = 'obsidian';
+      }
+      return parsed;
+    }
+    return {
       currency: 'INR',
       region: 'India (IN)',
-      theme: 'dark',
+      theme: 'obsidian',
       enableAudioAlerts: false,
       liveFeedRefreshRate: 30,
       alertChannels: {
@@ -120,10 +205,116 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
+  const [isScrapeModalOpen, setIsScrapeModalOpen] = useState(false);
   const [activeAlertModalProduct, setActiveAlertModalProduct] = useState<Product | null>(null);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('Just now');
 
+  // Apply theme to document root
+  useEffect(() => {
+    const currentTheme = settings.theme || 'obsidian';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    document.body.setAttribute('data-theme', currentTheme);
+    if (currentTheme === 'light') {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+      document.body.classList.remove('dark');
+      document.body.classList.add('light');
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+      document.body.classList.add('dark');
+      document.body.classList.remove('light');
+    }
+  }, [settings.theme]);
+
+  // Load from Supabase on startup & setup Realtime subscriptions
+  useEffect(() => {
+    if (isSupabaseConfigured) {
+      syncWithSupabaseDatabase();
+
+      const supabase = getSupabase();
+      if (supabase) {
+        // Listen to Supabase auth state
+        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) {
+            const userProf: UserAuthProfile = {
+              id: session.user.id,
+              email: session.user.email,
+              isAnonymous: false,
+            };
+            setCurrentUser(userProf);
+            localStorage.setItem('drop_picker_auth_user', JSON.stringify(userProf));
+          }
+        });
+
+        // Setup Realtime postgres changes channel
+        const unsubscribeRealtime = subscribeToSupabaseRealtime(
+          (updatedProduct) => {
+            setProducts(prev => {
+              const idx = prev.findIndex(p => p.id === updatedProduct.id);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = updatedProduct;
+                return next;
+              }
+              return [updatedProduct, ...prev];
+            });
+            setLastUpdatedTime('Just now');
+          },
+          (dropEvent) => {
+            setLiveDrops(prev => [dropEvent, ...prev.slice(0, 49)]);
+            addToast({
+              type: 'drop',
+              title: `Live Drop: ${dropEvent.product.name}`,
+              message: `Price slashed by ${Math.abs(dropEvent.percentageChange)}% to ₹${dropEvent.newPrice.toLocaleString('en-IN')}`
+            });
+          }
+        );
+
+        return () => {
+          authListener?.subscription.unsubscribe();
+          unsubscribeRealtime();
+        };
+      }
+    }
+  }, []);
+
+  const syncWithSupabaseDatabase = async () => {
+    if (!isSupabaseConfigured) return;
+    try {
+      // 1. Fetch remote products
+      const remoteProducts = await fetchProductsFromSupabase();
+      if (remoteProducts && remoteProducts.length > 0) {
+        setProducts(remoteProducts);
+        localStorage.setItem('drop_picker_products', JSON.stringify(remoteProducts));
+      }
+
+      // 2. Fetch remote watchlist if logged in
+      if (currentUser?.id && !currentUser.isAnonymous) {
+        const remoteWatchlist = await fetchWatchlistFromSupabase(currentUser.id);
+        if (remoteWatchlist) {
+          setWatchlist(remoteWatchlist);
+        }
+
+        const remoteAlerts = await fetchPriceAlertsFromSupabase(currentUser.id);
+        if (remoteAlerts) {
+          setPriceAlerts(remoteAlerts);
+        }
+      }
+    } catch (err) {
+      console.warn('Background Supabase synchronization error:', err);
+    }
+  };
+
   // Persistence helpers
+  useEffect(() => {
+    localStorage.setItem('drop_picker_products', JSON.stringify(products));
+  }, [products]);
+
+  useEffect(() => {
+    localStorage.setItem('drop_picker_live_drops', JSON.stringify(liveDrops));
+  }, [liveDrops]);
+
   useEffect(() => {
     localStorage.setItem('drop_picker_watchlist', JSON.stringify(watchlist));
   }, [watchlist]);
@@ -159,11 +350,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isCommandOpen]);
 
-  // Real-time live simulation ticker
+  // Live status ticker
   useEffect(() => {
     const interval = setInterval(() => {
       setLastUpdatedTime('Just now');
-    }, 15000);
+    }, 20000);
     return () => clearInterval(interval);
   }, []);
 
@@ -195,6 +386,83 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  // Scrape any URL with Bright Data & Add to Catalog
+  const scrapeAndTrackUrl = async (url: string): Promise<{ success: boolean; product?: ScrapedProductData; message: string }> => {
+    const backendUrl = getBackendApiUrl();
+    const result = await scrapeUrlWithBrightData(url, backendUrl);
+    
+    if (result.success && result.product) {
+      const p = result.product;
+      const newProd: Product = {
+        id: `prod_${Date.now()}`,
+        name: p.name,
+        brand: p.brand,
+        category: p.category,
+        subCategory: p.subCategory,
+        image: p.image,
+        currentPrice: p.currentPrice,
+        originalPrice: p.originalPrice,
+        lowestPrice: p.currentPrice,
+        averagePrice: p.originalPrice || p.currentPrice,
+        highestPrice: p.originalPrice || p.currentPrice,
+        dealScore: p.dealScore,
+        stockStatus: p.stockStatus,
+        store: p.store,
+        specs: p.specs,
+        allStores: [
+          {
+            storeName: p.store,
+            price: p.currentPrice,
+            url: p.url,
+            stock: p.stockStatus,
+            type: 'Physical',
+            shipping: 'Free Express',
+            updatedAt: 'Just now'
+          }
+        ],
+        updatedAt: 'Just now'
+      };
+
+      // Add to local state
+      setProducts(prev => [newProd, ...prev]);
+
+      // Sync to Supabase
+      if (isSupabaseConfigured) {
+        await createProductInSupabase(newProd);
+      }
+
+      addToast({
+        type: 'success',
+        title: 'Product Scraped & Ingested',
+        message: `${newProd.name} (${newProd.store})`
+      });
+
+      return {
+        success: true,
+        product: p,
+        message: result.message
+      };
+    }
+
+    return {
+      success: false,
+      message: result.message
+    };
+  };
+
+  // Trigger Backend Scrape Job
+  const triggerBackendScrapeJob = async (store: string = 'all', category: string = 'all') => {
+    const res = await triggerLiveScraper(store, category);
+    if (res.success) {
+      addToast({
+        type: 'info',
+        title: 'Scraper Daemon Dispatched',
+        message: res.message
+      });
+    }
+    return res;
+  };
+
   const addToWatchlist = (productId: string, targetPrice?: number) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
@@ -219,6 +487,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     setWatchlist(prev => [newItem, ...prev]);
+
+    // Persist to Supabase if configured
+    if (isSupabaseConfigured && currentUser?.id) {
+      syncWatchlistItemToSupabase(currentUser.id, newItem);
+    }
+
     addToast({
       type: 'success',
       title: '✓ Added to Watchlist',
@@ -229,6 +503,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const removeFromWatchlist = (productId: string) => {
     const item = watchlist.find(w => w.productId === productId);
     setWatchlist(prev => prev.filter(w => w.productId !== productId));
+    
+    if (isSupabaseConfigured && currentUser?.id) {
+      removeWatchlistItemFromSupabase(currentUser.id, productId);
+    }
+
     if (item) {
       addToast({
         type: 'info',
@@ -241,7 +520,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateWatchlistTarget = (productId: string, targetPrice: number) => {
     setWatchlist(prev => prev.map(w => {
       if (w.productId === productId) {
-        return { ...w, targetPrice };
+        const updated = { ...w, targetPrice };
+        if (isSupabaseConfigured && currentUser?.id) {
+          syncWatchlistItemToSupabase(currentUser.id, updated);
+        }
+        return updated;
       }
       return w;
     }));
@@ -264,6 +547,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createdAt: 'Just now'
     };
     setPriceAlerts(prev => [newAlert, ...prev]);
+
+    if (isSupabaseConfigured && currentUser?.id) {
+      syncPriceAlertToSupabase(currentUser.id, newAlert);
+    }
+
     addToast({
       type: 'alert',
       title: '✓ Price Alert Created',
@@ -273,6 +561,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deletePriceAlert = (id: string) => {
     setPriceAlerts(prev => prev.filter(a => a.id !== id));
+    if (isSupabaseConfigured) {
+      deleteAlertFromSupabase(id);
+    }
     addToast({
       type: 'info',
       title: 'Price Alert Removed'
@@ -282,8 +573,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const togglePriceAlertStatus = (id: string) => {
     setPriceAlerts(prev => prev.map(a => {
       if (a.id === id) {
-        const nextStatus = a.status === 'active' ? 'paused' : 'active';
-        return { ...a, status: nextStatus };
+        const nextStatus: 'active' | 'paused' = a.status === 'active' ? 'paused' : 'active';
+        const updated: PriceAlert = { ...a, status: nextStatus };
+        if (isSupabaseConfigured && currentUser?.id) {
+          syncPriceAlertToSupabase(currentUser.id, updated);
+        }
+        return updated;
       }
       return a;
     }));
@@ -306,6 +601,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteRestockAlert = (id: string) => {
     setRestockAlerts(prev => prev.filter(a => a.id !== id));
+    if (isSupabaseConfigured) {
+      deleteAlertFromSupabase(id);
+    }
     addToast({
       type: 'info',
       title: 'Restock Alert Removed'
@@ -320,7 +618,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     addToast({
       type: 'info',
-      title: 'All notifications marked as read'
+      title: 'All Notifications Read'
     });
   };
 
@@ -328,130 +626,103 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setNotifications([]);
     addToast({
       type: 'info',
-      title: 'Notifications Cleared'
+      title: 'Notification Center Cleared'
     });
   };
 
-  // Live Drop Simulation Function
-  const triggerLiveDropSimulation = () => {
-    const candidateProducts = [...products];
-    const randomProduct = candidateProducts[Math.floor(Math.random() * candidateProducts.length)];
-    const isDrop = Math.random() > 0.3;
-    
-    if (isDrop) {
-      const dropPct = -(Math.floor(Math.random() * 20) + 5);
-      const oldPrice = randomProduct.currentPrice;
-      const newPrice = Math.round(oldPrice * (1 + dropPct / 100));
-      
-      const newEvent: LiveDropEvent = {
-        id: `drop_${Date.now()}`,
-        product: { ...randomProduct, currentPrice: newPrice },
-        previousPrice: oldPrice,
-        newPrice: newPrice,
-        percentageChange: dropPct,
-        timestamp: 'Just now',
-        type: 'drop',
-        store: randomProduct.store
-      };
-
-      setLiveDrops(prev => [newEvent, ...prev.slice(0, 19)]);
-      
-      // Update product in list
-      setProducts(prev => prev.map(p => p.id === randomProduct.id ? {
-        ...p,
-        currentPrice: newPrice,
-        updatedAt: 'Just now',
-        lowestPrice: Math.min(p.lowestPrice, newPrice),
-        dealScore: Math.min(99, p.dealScore + 6)
-      } : p));
-
-      // Add Notification
-      const notif: Notification = {
-        id: `notif_${Date.now()}`,
-        type: 'price_drop',
-        title: 'Flash Drop Detected',
-        message: `${randomProduct.name} dropped by ${Math.abs(dropPct)}% to ₹${newPrice.toLocaleString('en-IN')}`,
-        timestamp: 'Just now',
-        read: false,
-        productId: randomProduct.id,
-        price: newPrice,
-        discountPercent: Math.abs(dropPct)
-      };
-      setNotifications(prev => [notif, ...prev]);
-
+  // Supabase Auth wrappers
+  const loginWithSupabase = async (email: string, password?: string) => {
+    const res = await signInWithEmail(email, password);
+    if (res.success) {
+      const user = await getSupabaseUser();
+      setCurrentUser(user);
+      if (user) localStorage.setItem('drop_picker_auth_user', JSON.stringify(user));
+      syncWithSupabaseDatabase();
       addToast({
-        type: 'drop',
-        title: `↓ Price dropped ₹${(oldPrice - newPrice).toLocaleString('en-IN')}`,
-        message: `${randomProduct.name} on ${randomProduct.store}`
+        type: 'success',
+        title: 'Logged In with Supabase',
+        message: email
       });
     } else {
-      // Restock Simulation
-      const newEvent: LiveDropEvent = {
-        id: `rst_${Date.now()}`,
-        product: randomProduct,
-        previousPrice: randomProduct.currentPrice,
-        newPrice: randomProduct.currentPrice,
-        percentageChange: 0,
-        timestamp: 'Just now',
-        type: 'restock',
-        store: randomProduct.store
-      };
-
-      setLiveDrops(prev => [newEvent, ...prev.slice(0, 19)]);
-
-      const notif: Notification = {
-        id: `notif_${Date.now()}`,
-        type: 'restock',
-        title: 'Item Restocked',
-        message: `${randomProduct.name} is back in stock at ${randomProduct.store}.`,
-        timestamp: 'Just now',
-        read: false,
-        productId: randomProduct.id,
-        price: randomProduct.currentPrice
-      };
-      setNotifications(prev => [notif, ...prev]);
-
       addToast({
-        type: 'restock',
-        title: `● ${randomProduct.name} Restocked`,
-        message: `Now available on ${randomProduct.store}`
+        type: 'alert',
+        title: 'Login Failed',
+        message: res.error
       });
     }
+    return res;
   };
 
-  const adminUpdateProductPrice = (productId: string, newPrice: number, store: string = 'Amazon') => {
+  const registerWithSupabase = async (email: string, password?: string) => {
+    const res = await signUpWithEmail(email, password);
+    if (res.success) {
+      addToast({
+        type: 'success',
+        title: 'Sign Up Successful',
+        message: 'Account registered with Supabase.'
+      });
+    } else {
+      addToast({
+        type: 'alert',
+        title: 'Sign Up Failed',
+        message: res.error
+      });
+    }
+    return res;
+  };
+
+  const logoutSupabase = async () => {
+    await signOutSupabase();
+    setCurrentUser(null);
+    localStorage.removeItem('drop_picker_auth_user');
+    addToast({
+      type: 'info',
+      title: 'Signed Out of Supabase'
+    });
+  };
+
+  const adminUpdateProductPrice = (productId: string, newPrice: number, store?: string) => {
     setProducts(prev => prev.map(p => {
       if (p.id === productId) {
-        const oldPrice = p.currentPrice;
-        const pctChange = ((newPrice - oldPrice) / oldPrice) * 100;
-        
-        // Add drop event
-        const dropEvent: LiveDropEvent = {
-          id: `admin_drop_${Date.now()}`,
-          product: { ...p, currentPrice: newPrice },
-          previousPrice: oldPrice,
-          newPrice,
-          percentageChange: pctChange,
-          timestamp: 'Just now',
-          type: newPrice < oldPrice ? 'drop' : 'price_hike',
-          store: store || p.store
-        };
-        setLiveDrops(drops => [dropEvent, ...drops]);
-
-        return {
+        const prevPrice = p.currentPrice;
+        const lowestPrice = Math.min(p.lowestPrice, newPrice);
+        const highestPrice = Math.max(p.highestPrice, newPrice);
+        const updated = {
           ...p,
           currentPrice: newPrice,
-          lowestPrice: Math.min(p.lowestPrice, newPrice),
-          highestPrice: Math.max(p.highestPrice, newPrice),
+          lowestPrice,
+          highestPrice,
+          store: store || p.store,
           updatedAt: 'Just now'
         };
+
+        if (isSupabaseConfigured) {
+          updateProductPriceInSupabase(productId, newPrice, store);
+        }
+
+        if (newPrice < prevPrice) {
+          const dropPercent = Math.round(((prevPrice - newPrice) / prevPrice) * 100);
+          const dropEvent: LiveDropEvent = {
+            id: `drop_${Date.now()}`,
+            product: updated,
+            previousPrice: prevPrice,
+            newPrice: newPrice,
+            percentageChange: -dropPercent,
+            timestamp: 'Just now',
+            type: 'drop',
+            store: store || p.store
+          };
+          setLiveDrops(drops => [dropEvent, ...drops.slice(0, 49)]);
+        }
+
+        return updated;
       }
       return p;
     }));
 
     addToast({
       type: 'success',
-      title: 'Admin: Price Updated',
+      title: 'Price Updated',
       message: `Product price set to ₹${newPrice.toLocaleString('en-IN')}`
     });
   };
@@ -460,17 +731,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProducts(prev => prev.map(p => p.id === productId ? { ...p, stockStatus: status, updatedAt: 'Just now' } : p));
     addToast({
       type: 'info',
-      title: 'Admin: Stock Updated',
+      title: 'Stock Updated',
       message: `Status changed to ${status}`
     });
   };
 
   const adminAddProduct = (newProduct: Product) => {
     setProducts(prev => [newProduct, ...prev]);
+    if (isSupabaseConfigured) {
+      createProductInSupabase(newProduct);
+    }
     addToast({
       type: 'success',
-      title: 'Admin: Product Added',
+      title: 'Product Ingested',
       message: newProduct.name
+    });
+  };
+
+  const adminDeleteProduct = (productId: string) => {
+    setProducts(prev => prev.filter(p => p.id !== productId));
+    if (isSupabaseConfigured) {
+      deleteProductFromSupabase(productId);
+    }
+    addToast({
+      type: 'info',
+      title: 'Product Removed'
     });
   };
 
@@ -486,8 +771,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         settings,
         toasts,
         isCommandOpen,
+        isScrapeModalOpen,
         activeAlertModalProduct,
         lastUpdatedTime,
+        currentUser,
+        isSupabaseActive: isSupabaseConfigured,
         setCurrency,
         updateSettings,
         addToWatchlist,
@@ -503,13 +791,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         markAllNotificationsAsRead,
         clearNotifications,
         setIsCommandOpen,
+        setIsScrapeModalOpen,
         setActiveAlertModalProduct,
-        triggerLiveDropSimulation,
         addToast,
         removeToast,
+        scrapeAndTrackUrl,
+        triggerBackendScrapeJob,
+        loginWithSupabase,
+        registerWithSupabase,
+        logoutSupabase,
+        syncWithSupabaseDatabase,
         adminUpdateProductPrice,
         adminUpdateStock,
-        adminAddProduct
+        adminAddProduct,
+        adminDeleteProduct
       }}
     >
       {children}

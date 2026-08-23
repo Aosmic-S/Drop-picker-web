@@ -4,14 +4,14 @@ import { useApp } from '@/src/context/AppContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { generatePriceHistory } from '../lib/mockData';
 import { 
   formatCurrency, 
   formatPercentage, 
   getDealScoreColor, 
   getDealScoreLabel, 
   getDealScoreBg, 
-  getStockBadgeVariant 
+  getStockBadgeVariant,
+  generatePriceHistory
 } from '../lib/utils';
 import { 
   AreaChart, 
@@ -35,16 +35,43 @@ import {
   Sparkles, 
   ArrowLeft,
   Share2,
-  Info
+  Info,
+  Package
 } from 'lucide-react';
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
-  const { products, settings, addToWatchlist, isProductInWatchlist, setActiveAlertModalProduct, addToast } = useApp();
+  const { products, settings, addToWatchlist, isProductInWatchlist, setActiveAlertModalProduct, addToast, setIsScrapeModalOpen } = useApp();
 
   const product = products.find(p => p.id === id) || products[0];
   const [selectedRange, setSelectedRange] = useState<string>('30D');
   const [selectedEditionIndex, setSelectedEditionIndex] = useState<number>(0);
+
+  if (!product) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-[#0D0F12] border border-gray-800 rounded-xl">
+        <Package className="h-12 w-12 text-gray-600 mb-3" />
+        <h2 className="text-xl font-bold text-gray-200">Product Not Found</h2>
+        <p className="text-xs text-gray-400 mt-1 max-w-md">
+          This product is not currently in your active catalog. You can paste an e-commerce URL to scrape and track its pricing in real time.
+        </p>
+        <div className="flex items-center gap-3 mt-5">
+          <Link to="/">
+            <Button variant="outline" size="sm" className="text-xs">
+              <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Back to Dashboard
+            </Button>
+          </Link>
+          <Button 
+            onClick={() => setIsScrapeModalOpen(true)} 
+            size="sm" 
+            className="text-xs bg-emerald-500 hover:bg-emerald-600 text-black font-semibold"
+          >
+            <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Scrape Product URL
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const inWatch = isProductInWatchlist(product.id);
   const priceHistoryData = generatePriceHistory(product.currentPrice, product.lowestPrice, product.highestPrice, selectedRange);

@@ -102,3 +102,36 @@ export function timeAgo(timestamp: string | number): string {
   if (diffHours < 24) return `${diffHours}h ago`;
   return `${diffDays}d ago`;
 }
+
+export function generatePriceHistory(currentPrice: number, lowestPrice: number, highestPrice: number, range: string) {
+  const points = range === '30D' ? 30 : range === '90D' ? 90 : 12;
+  const data = [];
+  const now = new Date();
+  
+  let lastPrice = highestPrice;
+  const spread = highestPrice - lowestPrice;
+
+  for (let i = points; i >= 0; i--) {
+    const d = new Date(now);
+    if (range === '1Y') {
+      d.setMonth(d.getMonth() - i);
+    } else {
+      d.setDate(d.getDate() - i);
+    }
+
+    if (i === 0) {
+      lastPrice = currentPrice;
+    } else {
+      const randomShift = (Math.random() - 0.4) * (spread * 0.1);
+      lastPrice = Math.max(lowestPrice, Math.min(highestPrice, lastPrice + randomShift));
+    }
+
+    data.push({
+      date: range === '1Y' 
+        ? d.toLocaleDateString('en-US', { month: 'short' })
+        : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      price: Math.round(lastPrice)
+    });
+  }
+  return data;
+}

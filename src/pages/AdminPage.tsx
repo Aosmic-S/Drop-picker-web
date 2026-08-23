@@ -8,7 +8,7 @@ import { ShieldAlert, Zap, Edit3, Plus, RefreshCw, Terminal, CheckCircle2 } from
 import { Product } from '../types';
 
 export function AdminPage() {
-  const { products, adminUpdateProductPrice, adminUpdateStock, triggerLiveDropSimulation, adminAddProduct, settings } = useApp();
+  const { products, adminUpdateProductPrice, adminUpdateStock, adminAddProduct, settings } = useApp();
   const [selectedProductId, setSelectedProductId] = useState<string>(products[0]?.id || '');
   const [newPrice, setNewPrice] = useState<number>(75000);
   const [storeName, setStoreName] = useState<string>('Amazon');
@@ -154,29 +154,6 @@ export function AdminPage() {
           </form>
         </Card>
 
-        {/* Global Live Simulation Trigger */}
-        <Card className="bg-[#0D0F12] border-gray-800 p-6 flex flex-col justify-between space-y-4">
-          <div>
-            <div className="flex items-center gap-2 border-b border-gray-800 pb-3 mb-4">
-              <Zap className="h-4 w-4 text-amber-400" />
-              <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider">
-                Instant Event Stream Generator
-              </h3>
-            </div>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              Pushes randomized price drops, discounts (5% to 25%), or restock events into the live pipeline. This validates toast notifications, watchlist trigger logic, and activity tickers.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Button
-              onClick={triggerLiveDropSimulation}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-10"
-            >
-              ⚡ Generate Random Flash Drop Event
-            </Button>
-          </div>
-        </Card>
       </div>
 
       {/* Catalog Injector */}

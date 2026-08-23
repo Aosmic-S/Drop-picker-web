@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useApp } from '@/src/context/AppContext';
+import { Logo } from '@/src/components/common/Logo';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -96,20 +97,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         )}
       >
         {/* Brand Header */}
-        <div className="flex h-16 items-center justify-between px-5 border-b border-gray-800/80 bg-[#0D0F12]">
-          <NavLink to="/" onClick={onClose} className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-black shadow-[0_0_12px_rgba(16,185,129,0.3)]">
-              <TrendingDown className="h-5 w-5 stroke-[2.5]" />
-            </div>
-            <div>
-              <h1 className="text-sm font-extrabold uppercase tracking-wider text-gray-100 font-mono">Drop Picker</h1>
-              <p className="text-[10px] uppercase font-semibold text-emerald-400 tracking-wider">Commerce Intelligence</p>
-            </div>
+        <div className="flex h-16 items-center justify-between px-4 border-b border-gray-800/80 bg-[#0D0F12]">
+          <NavLink to="/" onClick={onClose} className="flex items-center group">
+            <Logo size="md" />
           </NavLink>
           {onClose && (
             <button 
               onClick={onClose}
-              className="p-1 rounded-lg text-gray-400 hover:text-gray-100 md:hidden"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-100 md:hidden hover:bg-gray-800"
             >
               <X className="h-5 w-5" />
             </button>

@@ -1,21 +1,125 @@
 @import "tailwindcss";
 
-@theme {
+:root {
   --color-background: #08090B;
   --color-surface-1: #0D0F12;
   --color-surface-2: #12151A;
   --color-surface-3: #171A20;
+  --color-surface-4: #20242C;
   
   --color-text-primary: #F5F7FA;
   --color-text-secondary: #9AA1AC;
   --color-text-muted: #626A76;
+
+  --color-accent: #10B981;
+  --color-accent-hover: #059669;
+  --color-accent-glow: rgba(16, 185, 129, 0.25);
+  --color-border: #1F2937;
+  --color-border-subtle: #161B22;
+}
+
+[data-theme="obsidian"] {
+  --color-background: #08090B;
+  --color-surface-1: #0D0F12;
+  --color-surface-2: #12151A;
+  --color-surface-3: #171A20;
+  --color-surface-4: #20242C;
+  --color-text-primary: #F5F7FA;
+  --color-text-secondary: #9AA1AC;
+  --color-text-muted: #626A76;
+  --color-accent: #10B981;
+  --color-accent-hover: #059669;
+  --color-accent-glow: rgba(16, 185, 129, 0.25);
+  --color-border: #1F2937;
+  --color-border-subtle: #161B22;
+}
+
+[data-theme="oled"] {
+  --color-background: #000000;
+  --color-surface-1: #070709;
+  --color-surface-2: #0E0F13;
+  --color-surface-3: #161820;
+  --color-surface-4: #222530;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #A1A1AA;
+  --color-text-muted: #52525B;
+  --color-accent: #38BDF8;
+  --color-accent-hover: #0284C7;
+  --color-accent-glow: rgba(56, 189, 248, 0.3);
+  --color-border: #22242B;
+  --color-border-subtle: #141518;
+}
+
+[data-theme="cyberpunk"] {
+  --color-background: #040711;
+  --color-surface-1: #080E20;
+  --color-surface-2: #0D1630;
+  --color-surface-3: #14224A;
+  --color-surface-4: #1E3166;
+  --color-text-primary: #F0FDF4;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
+  --color-accent: #06B6D4;
+  --color-accent-hover: #0891B2;
+  --color-accent-glow: rgba(6, 182, 212, 0.35);
+  --color-border: #1A2C5B;
+  --color-border-subtle: #0E1A38;
+}
+
+[data-theme="slate"] {
+  --color-background: #0B0F17;
+  --color-surface-1: #111827;
+  --color-surface-2: #1F2937;
+  --color-surface-3: #374151;
+  --color-surface-4: #4B5563;
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
+  --color-accent: #818CF8;
+  --color-accent-hover: #6366F1;
+  --color-accent-glow: rgba(129, 140, 248, 0.3);
+  --color-border: #334155;
+  --color-border-subtle: #1E293B;
+}
+
+[data-theme="ember"] {
+  --color-background: #0C0A09;
+  --color-surface-1: #14110F;
+  --color-surface-2: #1C1917;
+  --color-surface-3: #292524;
+  --color-surface-4: #44403C;
+  --color-text-primary: #FAFAF9;
+  --color-text-secondary: #A8A29E;
+  --color-text-muted: #78716C;
+  --color-accent: #F97316;
+  --color-accent-hover: #EA580C;
+  --color-accent-glow: rgba(249, 115, 22, 0.3);
+  --color-border: #2E2623;
+  --color-border-subtle: #1F1A18;
+}
+
+[data-theme="light"] {
+  --color-background: #F8FAFC;
+  --color-surface-1: #FFFFFF;
+  --color-surface-2: #F1F5F9;
+  --color-surface-3: #E2E8F0;
+  --color-surface-4: #CBD5E1;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
+  --color-accent: #059669;
+  --color-accent-hover: #047857;
+  --color-accent-glow: rgba(5, 150, 105, 0.2);
+  --color-border: #E2E8F0;
+  --color-border-subtle: #F1F5F9;
 }
 
 body {
   background-color: var(--color-background);
   color: var(--color-text-primary);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 .mono {
@@ -24,8 +128,8 @@ body {
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -36,4 +140,148 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+}
+
+/* ==========================================================================
+   Global Dynamic Theme Mappings (Affects Entire Dashboard UI)
+   ========================================================================== */
+
+/* Main canvas background */
+[data-theme] .bg-\[\#08090B\],
+[data-theme] .bg-\[\#08090b\],
+[data-theme] .bg-\[\#08090B\]\/90,
+[data-theme] .bg-\[\#08090B\]\/80 {
+  background-color: var(--color-background) !important;
+}
+
+/* Surface 1: Cards, Headers, Modals */
+[data-theme] .bg-\[\#0D0F12\],
+[data-theme] .bg-\[\#0d0f12\],
+[data-theme] .bg-\[\#0D0F12\]\/95,
+[data-theme] .bg-\[\#0D0F12\]\/90 {
+  background-color: var(--color-surface-1) !important;
+}
+
+/* Surface 2: Sub-panels, list items, search bars, table headers */
+[data-theme] .bg-\[\#12151A\],
+[data-theme] .bg-\[\#12151a\],
+[data-theme] .bg-\[\#12151A\]\/60,
+[data-theme] .bg-\[\#12151A\]\/80 {
+  background-color: var(--color-surface-2) !important;
+}
+
+/* Surface 3: Badges, hover rows, command palette kbd */
+[data-theme] .bg-\[\#171A20\],
+[data-theme] .bg-\[\#171a20\],
+[data-theme] .bg-\[\#141820\] {
+  background-color: var(--color-surface-3) !important;
+}
+
+/* Borders */
+[data-theme] .border-gray-800,
+[data-theme] .border-gray-800\/80,
+[data-theme] .border-gray-800\/60,
+[data-theme] .border-gray-800\/40,
+[data-theme] .divide-gray-800,
+[data-theme] .divide-gray-800\/60 {
+  border-color: var(--color-border) !important;
+}
+
+[data-theme] .border-gray-700,
+[data-theme] .border-gray-700\/60 {
+  border-color: var(--color-border) !important;
+}
+
+/* Typography Colors */
+[data-theme] .text-gray-100,
+[data-theme] .text-gray-200 {
+  color: var(--color-text-primary) !important;
+}
+
+[data-theme] .text-gray-300,
+[data-theme] .text-gray-400 {
+  color: var(--color-text-secondary) !important;
+}
+
+[data-theme] .text-gray-500,
+[data-theme] .text-gray-600 {
+  color: var(--color-text-muted) !important;
+}
+
+/* Theme Accents */
+[data-theme] .text-emerald-400,
+[data-theme] .text-emerald-500 {
+  color: var(--color-accent) !important;
+}
+
+[data-theme] .bg-emerald-500,
+[data-theme] .bg-emerald-600 {
+  background-color: var(--color-accent) !important;
+}
+
+[data-theme] .bg-emerald-500\/10,
+[data-theme] .bg-emerald-500\/5,
+[data-theme] .bg-emerald-500\/20,
+[data-theme] .bg-emerald-400\/10 {
+  background-color: var(--color-accent-glow) !important;
+}
+
+[data-theme] .border-emerald-500\/20,
+[data-theme] .border-emerald-500\/30,
+[data-theme] .border-emerald-500\/40,
+[data-theme] .border-emerald-500\/50,
+[data-theme] .border-emerald-500\/60 {
+  border-color: var(--color-accent-glow) !important;
+}
+
+/* ==========================================================================
+   Light Mode Theme Polish & Specific Overrides
+   ========================================================================== */
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+[data-theme="light"] aside,
+[data-theme="light"] header,
+[data-theme="light"] nav {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+}
+
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #CBD5E1 !important;
+}
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #94A3B8 !important;
+}
+
+[data-theme="light"] .bg-gray-800,
+[data-theme="light"] .bg-gray-900,
+[data-theme="light"] .bg-gray-800\/60,
+[data-theme="light"] .bg-gray-800\/80 {
+  background-color: #F1F5F9 !important;
+  color: #1E293B !important;
+}
+
+[data-theme="light"] .hover\:bg-gray-800:hover,
+[data-theme="light"] .hover\:bg-gray-800\/60:hover,
+[data-theme="light"] .hover\:bg-gray-900:hover {
+  background-color: #E2E8F0 !important;
+}
+
+[data-theme="light"] .shadow-2xl,
+[data-theme="light"] .shadow-lg,
+[data-theme="light"] .shadow-sm {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] button.bg-emerald-500,
+[data-theme="light"] .bg-emerald-500 {
+  color: #FFFFFF !important;
 }

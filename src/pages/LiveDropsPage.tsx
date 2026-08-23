@@ -9,7 +9,7 @@ import { TrendingDown, Filter, Zap, Volume2, VolumeX, Pause, Play, Bell, Bookmar
 import { Link } from 'react-router';
 
 export function LiveDropsPage() {
-  const { liveDrops, triggerLiveDropSimulation, settings, addToWatchlist, isProductInWatchlist, setActiveAlertModalProduct } = useApp();
+  const { liveDrops, settings, addToWatchlist, isProductInWatchlist, setActiveAlertModalProduct } = useApp();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [minDropPercent, setMinDropPercent] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -69,13 +69,6 @@ export function LiveDropsPage() {
             {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
             <span>{isPaused ? 'Resume' : 'Pause Stream'}</span>
           </button>
-
-          <Button
-            onClick={triggerLiveDropSimulation}
-            className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs h-9"
-          >
-            <Zap className="h-3.5 w-3.5 mr-1" /> Simulate Drop Event
-          </Button>
         </div>
       </div>
 

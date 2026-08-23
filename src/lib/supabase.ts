@@ -1,26 +1,73 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Safe retrieval of environment variables without relying on vite types in tsc
+// Safe retrieval of environment variables or local storage configuration
 const metaEnv = (import.meta as unknown as { env?: Record<string, string | undefined> }).env || {};
-const supabaseUrl = metaEnv.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = metaEnv.VITE_SUPABASE_ANON_KEY || '';
+
+export function getSupabaseCredentials(): { url: string; anonKey: string } {
+  let url = metaEnv.VITE_SUPABASE_URL || '';
+  let anonKey = metaEnv.VITE_SUPABASE_ANON_KEY || '';
+
+  if (typeof window !== 'undefined') {
+    const customUrl = localStorage.getItem('drop_picker_supabase_url');
+    const customKey = localStorage.getItem('drop_picker_supabase_anon_key');
+    if (customUrl) url = customUrl;
+    if (customKey) anonKey = customKey;
+  }
+
+  return { url, anonKey };
+}
 
 let supabaseInstance: SupabaseClient | null = null;
+let lastUsedUrl = '';
+let lastUsedKey = '';
 
-export const isSupabaseConfigured = Boolean(
-  supabaseUrl && 
-  supabaseAnonKey && 
-  !supabaseUrl.includes('your-project-id') &&
-  !supabaseAnonKey.includes('your-anon-key')
-);
+export function getIsSupabaseConfigured(): boolean {
+  const { url, anonKey } = getSupabaseCredentials();
+  return Boolean(
+    url && 
+    anonKey && 
+    !url.includes('your-project-id') &&
+    !anonKey.includes('your-anon-key')
+  );
+}
+
+export const isSupabaseConfigured = getIsSupabaseConfigured();
+
+export function setSupabaseCredentials(url: string, anonKey: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('drop_picker_supabase_url', url.trim());
+    localStorage.setItem('drop_picker_supabase_anon_key', anonKey.trim());
+    supabaseInstance = null;
+  }
+}
+
+export function clearSupabaseCredentials() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('drop_picker_supabase_url');
+    localStorage.removeItem('drop_picker_supabase_anon_key');
+    supabaseInstance = null;
+  }
+}
 
 export function getSupabase(): SupabaseClient | null {
-  if (!isSupabaseConfigured) {
+  const { url, anonKey } = getSupabaseCredentials();
+  const configured = Boolean(
+    url && 
+    anonKey && 
+    !url.includes('your-project-id') &&
+    !anonKey.includes('your-anon-key')
+  );
+
+  if (!configured) {
     return null;
   }
-  if (!supabaseInstance) {
-    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+
+  if (!supabaseInstance || lastUsedUrl !== url || lastUsedKey !== anonKey) {
+    supabaseInstance = createClient(url, anonKey);
+    lastUsedUrl = url;
+    lastUsedKey = anonKey;
   }
+
   return supabaseInstance;
 }
 
@@ -31,10 +78,18 @@ export interface SupabaseConfigStatus {
 }
 
 export function getSupabaseStatus(): SupabaseConfigStatus {
+  const { url, anonKey } = getSupabaseCredentials();
+  const configured = Boolean(
+    url && 
+    anonKey && 
+    !url.includes('your-project-id') &&
+    !anonKey.includes('your-anon-key')
+  );
+
   return {
-    isConfigured: isSupabaseConfigured,
-    url: supabaseUrl ? `${supabaseUrl.substring(0, 18)}...` : 'Not set',
-    hasAnonKey: Boolean(supabaseAnonKey),
+    isConfigured: configured,
+    url: url ? (url.length > 24 ? `${url.substring(0, 24)}...` : url) : 'Not set',
+    hasAnonKey: Boolean(anonKey),
   };
 }
 

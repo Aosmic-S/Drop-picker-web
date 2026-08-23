@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { 
   Product, 
   LiveDropEvent, 
@@ -9,10 +9,11 @@ import {
   Currency, 
   UserSettings 
 } from '../types';
-import { INITIAL_PRODUCTS } from '../data/initialCatalog';
 import { 
-  isSupabaseConfigured,
+  getIsSupabaseConfigured,
   getSupabase,
+  setSupabaseCredentials,
+  clearSupabaseCredentials
 } from '../lib/supabase';
 import {
   fetchProductsFromSupabase,
@@ -64,6 +65,8 @@ interface AppContextType {
   lastUpdatedTime: string;
   currentUser: UserAuthProfile | null;
   isSupabaseActive: boolean;
+  isDatabaseLoading: boolean;
+  supabaseError: string | null;
   
   // Actions
   setCurrency: (currency: Currency) => void;
@@ -99,6 +102,7 @@ interface AppContextType {
   registerWithSupabase: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   logoutSupabase: () => Promise<void>;
   syncWithSupabaseDatabase: () => Promise<void>;
+  saveSupabaseConfig: (url: string, anonKey: string) => Promise<boolean>;
   
   // Admin & Modifiers
   adminUpdateProductPrice: (productId: string, newPrice: number, store?: string) => void;
@@ -110,19 +114,28 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const [isSupabaseActive, setIsSupabaseActive] = useState<boolean>(() => getIsSupabaseConfigured());
+  const [isDatabaseLoading, setIsDatabaseLoading] = useState<boolean>(false);
+  const [supabaseError, setSupabaseError] = useState<string | null>(null);
+
+  // Pure real database products state (starts empty - no fake items)
   const [products, setProducts] = useState<Product[]>(() => {
+    // Purge any legacy dummy items
     const saved = localStorage.getItem('drop_picker_products');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          const isReal = parsed.filter(p => !p.id?.startsWith('prod_rtx') && !p.id?.startsWith('prod_ryzen') && !p.id?.startsWith('prod_steam_deck'));
+          if (isReal.length > 0) {
+            return isReal;
+          }
         }
-      } catch (e) {
-        console.error('Error parsing stored products', e);
+      } catch {
+        // clean up
       }
     }
-    return INITIAL_PRODUCTS;
+    return [];
   });
 
   const [liveDrops, setLiveDrops] = useState<LiveDropEvent[]>(() => {
@@ -130,29 +143,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        if (Array.isArray(parsed)) {
+          const isReal = parsed.filter(d => !d.id?.startsWith('drop_init_') && !d.product?.id?.startsWith('prod_rtx'));
+          if (isReal.length > 0) return isReal;
         }
-      } catch (e) {
-        console.error('Error parsing stored drops', e);
-      }
+      } catch {}
     }
-    return INITIAL_PRODUCTS.filter(p => p.originalPrice && p.currentPrice < p.originalPrice).map((p, idx) => {
-      const oldPrice = p.originalPrice!;
-      const newPrice = p.currentPrice;
-      const diff = newPrice - oldPrice;
-      const pct = (diff / oldPrice) * 100;
-      return {
-        id: `drop_init_${p.id}_${idx}`,
-        product: p,
-        oldPrice,
-        newPrice,
-        percentageChange: Number(pct.toFixed(1)),
-        timestamp: p.updatedAt || 'Recent',
-        store: p.store,
-        type: 'drop' as const
-      };
-    });
+    return [];
   });
 
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => {
@@ -190,8 +187,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return parsed;
     }
     return {
-      currency: 'INR',
-      region: 'India (IN)',
+      currency: 'USD',
+      region: 'United States (US)',
       theme: 'obsidian',
       enableAudioAlerts: false,
       liveFeedRefreshRate: 30,
@@ -227,66 +224,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [settings.theme]);
 
-  // Load from Supabase on startup & setup Realtime subscriptions
-  useEffect(() => {
-    if (isSupabaseConfigured) {
-      syncWithSupabaseDatabase();
-
-      const supabase = getSupabase();
-      if (supabase) {
-        // Listen to Supabase auth state
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-          if (session?.user) {
-            const userProf: UserAuthProfile = {
-              id: session.user.id,
-              email: session.user.email,
-              isAnonymous: false,
-            };
-            setCurrentUser(userProf);
-            localStorage.setItem('drop_picker_auth_user', JSON.stringify(userProf));
-          }
-        });
-
-        // Setup Realtime postgres changes channel
-        const unsubscribeRealtime = subscribeToSupabaseRealtime(
-          (updatedProduct) => {
-            setProducts(prev => {
-              const idx = prev.findIndex(p => p.id === updatedProduct.id);
-              if (idx >= 0) {
-                const next = [...prev];
-                next[idx] = updatedProduct;
-                return next;
-              }
-              return [updatedProduct, ...prev];
-            });
-            setLastUpdatedTime('Just now');
-          },
-          (dropEvent) => {
-            setLiveDrops(prev => [dropEvent, ...prev.slice(0, 49)]);
-            addToast({
-              type: 'drop',
-              title: `Live Drop: ${dropEvent.product.name}`,
-              message: `Price slashed by ${Math.abs(dropEvent.percentageChange)}% to ₹${dropEvent.newPrice.toLocaleString('en-IN')}`
-            });
-          }
-        );
-
-        return () => {
-          authListener?.subscription.unsubscribe();
-          unsubscribeRealtime();
-        };
-      }
+  // Fetch real dataset from Supabase
+  const syncWithSupabaseDatabase = useCallback(async () => {
+    const configured = getIsSupabaseConfigured();
+    setIsSupabaseActive(configured);
+    
+    if (!configured) {
+      setSupabaseError('Supabase credentials not yet configured. Connect Supabase in Settings or environment to query live database.');
+      return;
     }
-  }, []);
 
-  const syncWithSupabaseDatabase = async () => {
-    if (!isSupabaseConfigured) return;
+    setIsDatabaseLoading(true);
+    setSupabaseError(null);
+
     try {
-      // 1. Fetch remote products
+      // 1. Query real products table
       const remoteProducts = await fetchProductsFromSupabase();
-      if (remoteProducts && remoteProducts.length > 0) {
+      if (remoteProducts !== null) {
         setProducts(remoteProducts);
         localStorage.setItem('drop_picker_products', JSON.stringify(remoteProducts));
+
+        // Recompute drops from real products that have a discount
+        const computedDrops: LiveDropEvent[] = remoteProducts
+          .filter(p => p.originalPrice && p.currentPrice < p.originalPrice)
+          .map((p, idx) => {
+            const oldP = p.originalPrice!;
+            const newP = p.currentPrice;
+            const pct = ((newP - oldP) / oldP) * 100;
+            return {
+              id: `drop_${p.id}_${idx}`,
+              product: p,
+              previousPrice: oldP,
+              newPrice: newP,
+              percentageChange: Number(pct.toFixed(1)),
+              timestamp: p.updatedAt || 'Recent',
+              store: p.store,
+              type: 'drop' as const
+            };
+          });
+
+        setLiveDrops(computedDrops);
+        localStorage.setItem('drop_picker_live_drops', JSON.stringify(computedDrops));
       }
 
       // 2. Fetch remote watchlist if logged in
@@ -301,9 +279,68 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setPriceAlerts(remoteAlerts);
         }
       }
-    } catch (err) {
-      console.warn('Background Supabase synchronization error:', err);
+      setLastUpdatedTime('Just now');
+    } catch (err: any) {
+      console.warn('Supabase synchronization error:', err);
+      setSupabaseError(err?.message || 'Failed to query Supabase database');
+    } finally {
+      setIsDatabaseLoading(false);
     }
+  }, [currentUser]);
+
+  // Load from Supabase on startup & setup Realtime subscriptions
+  useEffect(() => {
+    syncWithSupabaseDatabase();
+
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+          const userProf: UserAuthProfile = {
+            id: session.user.id,
+            email: session.user.email,
+            isAnonymous: false,
+          };
+          setCurrentUser(userProf);
+          localStorage.setItem('drop_picker_auth_user', JSON.stringify(userProf));
+        }
+      });
+
+      const unsubscribeRealtime = subscribeToSupabaseRealtime(
+        (updatedProduct) => {
+          setProducts(prev => {
+            const idx = prev.findIndex(p => p.id === updatedProduct.id);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = updatedProduct;
+              return next;
+            }
+            return [updatedProduct, ...prev];
+          });
+          setLastUpdatedTime('Just now');
+        },
+        (dropEvent) => {
+          setLiveDrops(prev => [dropEvent, ...prev.slice(0, 49)]);
+          addToast({
+            type: 'drop',
+            title: `Live Drop: ${dropEvent.product.name}`,
+            message: `Price changed on ${dropEvent.store}: $${dropEvent.newPrice.toFixed(2)}`
+          });
+        }
+      );
+
+      return () => {
+        authListener?.subscription.unsubscribe();
+        unsubscribeRealtime();
+      };
+    }
+  }, [syncWithSupabaseDatabase]);
+
+  const saveSupabaseConfig = async (url: string, anonKey: string): Promise<boolean> => {
+    setSupabaseCredentials(url, anonKey);
+    setIsSupabaseActive(true);
+    await syncWithSupabaseDatabase();
+    return true;
   };
 
   // Persistence helpers
@@ -427,7 +464,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setProducts(prev => [newProd, ...prev]);
 
       // Sync to Supabase
-      if (isSupabaseConfigured) {
+      if (isSupabaseActive) {
         await createProductInSupabase(newProd);
       }
 
@@ -489,7 +526,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setWatchlist(prev => [newItem, ...prev]);
 
     // Persist to Supabase if configured
-    if (isSupabaseConfigured && currentUser?.id) {
+    if (isSupabaseActive && currentUser?.id) {
       syncWatchlistItemToSupabase(currentUser.id, newItem);
     }
 
@@ -504,7 +541,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const item = watchlist.find(w => w.productId === productId);
     setWatchlist(prev => prev.filter(w => w.productId !== productId));
     
-    if (isSupabaseConfigured && currentUser?.id) {
+    if (isSupabaseActive && currentUser?.id) {
       removeWatchlistItemFromSupabase(currentUser.id, productId);
     }
 
@@ -521,7 +558,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setWatchlist(prev => prev.map(w => {
       if (w.productId === productId) {
         const updated = { ...w, targetPrice };
-        if (isSupabaseConfigured && currentUser?.id) {
+        if (isSupabaseActive && currentUser?.id) {
           syncWatchlistItemToSupabase(currentUser.id, updated);
         }
         return updated;
@@ -531,7 +568,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addToast({
       type: 'success',
       title: 'Target Price Updated',
-      message: `New target: ₹${targetPrice.toLocaleString('en-IN')}`
+      message: `New target: $${targetPrice.toFixed(2)}`
     });
   };
 
@@ -548,20 +585,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     setPriceAlerts(prev => [newAlert, ...prev]);
 
-    if (isSupabaseConfigured && currentUser?.id) {
+    if (isSupabaseActive && currentUser?.id) {
       syncPriceAlertToSupabase(currentUser.id, newAlert);
     }
 
     addToast({
       type: 'alert',
       title: '✓ Price Alert Created',
-      message: `Notify below ₹${alertData.targetPrice.toLocaleString('en-IN')}`
+      message: `Notify below $${alertData.targetPrice.toFixed(2)}`
     });
   };
 
   const deletePriceAlert = (id: string) => {
     setPriceAlerts(prev => prev.filter(a => a.id !== id));
-    if (isSupabaseConfigured) {
+    if (isSupabaseActive) {
       deleteAlertFromSupabase(id);
     }
     addToast({
@@ -575,7 +612,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (a.id === id) {
         const nextStatus: 'active' | 'paused' = a.status === 'active' ? 'paused' : 'active';
         const updated: PriceAlert = { ...a, status: nextStatus };
-        if (isSupabaseConfigured && currentUser?.id) {
+        if (isSupabaseActive && currentUser?.id) {
           syncPriceAlertToSupabase(currentUser.id, updated);
         }
         return updated;
@@ -601,7 +638,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteRestockAlert = (id: string) => {
     setRestockAlerts(prev => prev.filter(a => a.id !== id));
-    if (isSupabaseConfigured) {
+    if (isSupabaseActive) {
       deleteAlertFromSupabase(id);
     }
     addToast({
@@ -696,7 +733,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           updatedAt: 'Just now'
         };
 
-        if (isSupabaseConfigured) {
+        if (isSupabaseActive) {
           updateProductPriceInSupabase(productId, newPrice, store);
         }
 
@@ -723,7 +760,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addToast({
       type: 'success',
       title: 'Price Updated',
-      message: `Product price set to ₹${newPrice.toLocaleString('en-IN')}`
+      message: `Product price set to $${newPrice.toFixed(2)}`
     });
   };
 
@@ -738,7 +775,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const adminAddProduct = (newProduct: Product) => {
     setProducts(prev => [newProduct, ...prev]);
-    if (isSupabaseConfigured) {
+    if (isSupabaseActive) {
       createProductInSupabase(newProduct);
     }
     addToast({
@@ -750,7 +787,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const adminDeleteProduct = (productId: string) => {
     setProducts(prev => prev.filter(p => p.id !== productId));
-    if (isSupabaseConfigured) {
+    if (isSupabaseActive) {
       deleteProductFromSupabase(productId);
     }
     addToast({
@@ -775,7 +812,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         activeAlertModalProduct,
         lastUpdatedTime,
         currentUser,
-        isSupabaseActive: isSupabaseConfigured,
+        isSupabaseActive,
+        isDatabaseLoading,
+        supabaseError,
         setCurrency,
         updateSettings,
         addToWatchlist,
@@ -801,6 +840,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         registerWithSupabase,
         logoutSupabase,
         syncWithSupabaseDatabase,
+        saveSupabaseConfig,
         adminUpdateProductPrice,
         adminUpdateStock,
         adminAddProduct,

@@ -24,7 +24,7 @@ import {
   Sparkles,
   ShieldCheck
 } from 'lucide-react';
-import { isSupabaseConfigured, getSupabaseStatus, SUPABASE_SCHEMA_SQL } from '../lib/supabase';
+import { getSupabaseCredentials, getSupabaseStatus, SUPABASE_SCHEMA_SQL, getIsSupabaseConfigured } from '../lib/supabase';
 import { testSupabaseConnection } from '../lib/supabaseService';
 import { 
   getBackendApiUrl, 
@@ -39,7 +39,7 @@ import {
 } from '../lib/brightDataService';
 
 export function SettingsPage() {
-  const { settings, setCurrency, updateSettings, addToast, syncWithSupabaseDatabase } = useApp();
+  const { settings, setCurrency, updateSettings, addToast, syncWithSupabaseDatabase, saveSupabaseConfig, products, isDatabaseLoading } = useApp();
   const [copiedSql, setCopiedSql] = useState(false);
   const [copiedEnv, setCopiedEnv] = useState(false);
   const [showSqlSchema, setShowSqlSchema] = useState(false);
@@ -50,6 +50,12 @@ export function SettingsPage() {
     message: string;
     latencyMs?: number;
   } | null>(null);
+
+  // Supabase direct credentials state
+  const creds = getSupabaseCredentials();
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(creds.url);
+  const [supabaseAnonKeyInput, setSupabaseAnonKeyInput] = useState(creds.anonKey);
+  const [isSavingSupabase, setIsSavingSupabase] = useState(false);
 
   // Main Backend (Aosmic-S/Drop-Picker) State
   const [backendUrlInput, setBackendUrlInput] = useState(getBackendApiUrl());
@@ -78,10 +84,10 @@ export function SettingsPage() {
   const supabaseStatus = getSupabaseStatus();
 
   const currencies: { code: Currency; label: string; desc: string }[] = [
-    { code: 'INR', label: 'Indian Rupee (₹ INR)', desc: 'Optimized for Indian retailers (Amazon.in, Flipkart, Croma, MDComputers)' },
-    { code: 'USD', label: 'US Dollar ($ USD)', desc: 'North America / Global pricing reference' },
-    { code: 'EUR', label: 'Euro (€ EUR)', desc: 'European retail pricing reference' },
-    { code: 'GBP', label: 'British Pound (£ GBP)', desc: 'United Kingdom retail pricing' },
+    { code: 'USD', label: 'US Dollar ($ USD)', desc: 'Primary currency for Best Buy, Newegg, and Steam (US)' },
+    { code: 'EUR', label: 'Euro (€ EUR)', desc: 'European retail & Steam store regional pricing' },
+    { code: 'GBP', label: 'British Pound (£ GBP)', desc: 'UK retail pricing reference' },
+    { code: 'INR', label: 'Indian Rupee (₹ INR)', desc: 'International currency conversion' },
   ];
 
   const themeOptions: {
@@ -187,6 +193,33 @@ VITE_BRIGHTDATA_ZONE="web_unlocker_1"`;
       message: 'Paste into your project root .env file'
     });
     setTimeout(() => setCopiedEnv(false), 3000);
+  };
+
+  const handleSaveSupabase = async () => {
+    setIsSavingSupabase(true);
+    try {
+      await saveSupabaseConfig(supabaseUrlInput, supabaseAnonKeyInput);
+      addToast({
+        type: 'success',
+        title: 'Supabase Credentials Saved',
+        message: 'Synchronizing real dataset directly from Supabase...'
+      });
+      const test = await testSupabaseConnection();
+      setTestResult({
+        tested: true,
+        success: test.success,
+        message: test.message,
+        latencyMs: test.latencyMs
+      });
+    } catch (err: any) {
+      addToast({
+        type: 'alert',
+        title: 'Supabase Configuration Failed',
+        message: err.message || 'Check URL and Anon Key'
+      });
+    } finally {
+      setIsSavingSupabase(false);
+    }
   };
 
   const handleTestConnection = async () => {
@@ -643,19 +676,19 @@ VITE_BRIGHTDATA_ZONE="web_unlocker_1"`;
             <Database className="h-5 w-5 text-emerald-400" />
             <div>
               <h3 className="text-sm font-bold text-gray-100 flex items-center gap-2">
-                <span>Supabase Database & Auth Integration</span>
-                {isSupabaseConfigured ? (
+                <span>Supabase Live Dataset & Database Connection</span>
+                {getIsSupabaseConfigured() ? (
                   <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-400 border border-emerald-500/30">
-                    <Check className="h-3 w-3" /> Connected
+                    <Check className="h-3 w-3" /> Connected ({products.length} Products Loaded)
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-amber-400 border border-amber-500/20">
-                    Keys Needed
+                    Configuration Required
                   </span>
                 )}
               </h3>
               <p className="text-xs text-gray-400">
-                Connect your cloud Supabase database to persist user watchlists, price alert subscriptions, and custom price records.
+                Connect your cloud Supabase database to populate the dashboard with 100% real scraped products, stock changes, and price drop history.
               </p>
             </div>
           </div>
@@ -673,51 +706,80 @@ VITE_BRIGHTDATA_ZONE="web_unlocker_1"`;
           </div>
         </div>
 
-        {/* Required Credentials Checklist */}
-        <div className="rounded-xl border border-gray-800 bg-[#08090B] p-4 space-y-3">
-          <div className="text-xs font-bold text-gray-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
-            <Key className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Credentials to add in your Environment (.env)</span>
+        {/* Direct Credentials Input Form */}
+        <div className="space-y-4 rounded-xl border border-gray-800 bg-[#08090B] p-4">
+          <div className="text-xs font-bold text-gray-200 uppercase tracking-wider font-mono flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Key className="h-3.5 w-3.5 text-emerald-400" />
+              <span>Enter Supabase Project Credentials</span>
+            </div>
+            {isDatabaseLoading && (
+              <span className="text-[10px] text-emerald-400 animate-pulse font-mono">
+                Syncing database...
+              </span>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div className="p-3 rounded-lg border border-gray-800/80 bg-[#12151A]/80 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-emerald-400">VITE_SUPABASE_URL</span>
-                <span className="text-[10px] text-gray-500 font-mono">Required (Client)</span>
-              </div>
-              <p className="text-[11px] text-gray-400">
-                Your unique Supabase Project URL.
-              </p>
-              <div className="text-[10px] text-gray-500 pt-1">
-                📍 Found in Supabase Dashboard → <strong>Project Settings → API</strong>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-300 block mb-1">
+                Supabase Project URL (VITE_SUPABASE_URL)
+              </label>
+              <input
+                type="text"
+                value={supabaseUrlInput}
+                onChange={e => setSupabaseUrlInput(e.target.value)}
+                placeholder="https://xyzcompany.supabase.co"
+                className="w-full rounded-lg border border-gray-800 bg-[#12151A] px-3 py-2 text-xs font-mono text-gray-200 placeholder:text-gray-600 focus:border-emerald-500 focus:outline-none min-h-[40px]"
+              />
             </div>
 
-            <div className="p-3 rounded-lg border border-gray-800/80 bg-[#12151A]/80 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-emerald-400">VITE_SUPABASE_ANON_KEY</span>
-                <span className="text-[10px] text-gray-500 font-mono">Required (Public)</span>
-              </div>
-              <p className="text-[11px] text-gray-400">
-                The public anonymous API key for client-side queries.
-              </p>
-              <div className="text-[10px] text-gray-500 pt-1">
-                📍 Found in Supabase Dashboard → <strong>Project Settings → API</strong>
-              </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-300 block mb-1">
+                Supabase Anon Public Key (VITE_SUPABASE_ANON_KEY)
+              </label>
+              <input
+                type="password"
+                value={supabaseAnonKeyInput}
+                onChange={e => setSupabaseAnonKeyInput(e.target.value)}
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                className="w-full rounded-lg border border-gray-800 bg-[#12151A] px-3 py-2 text-xs font-mono text-gray-200 placeholder:text-gray-600 focus:border-emerald-500 focus:outline-none min-h-[40px]"
+              />
             </div>
           </div>
 
-          {/* Connection Test */}
-          <div className="flex flex-wrap items-center gap-3 pt-1">
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
             <Button
+              size="sm"
+              onClick={handleSaveSupabase}
+              disabled={isSavingSupabase || isDatabaseLoading}
+              className="text-xs bg-emerald-500 hover:bg-emerald-400 text-black font-bold gap-1.5 min-h-[36px]"
+            >
+              <Zap className={`h-3.5 w-3.5 ${isSavingSupabase ? 'animate-spin' : ''}`} />
+              {isSavingSupabase ? 'Saving & Syncing...' : 'Save & Sync Real Dataset'}
+            </Button>
+
+            <Button
+              variant="outline"
               size="sm"
               onClick={handleTestConnection}
               disabled={isTesting}
-              className="text-xs bg-emerald-500 hover:bg-emerald-600 text-black font-semibold gap-1.5 min-h-[36px]"
+              className="text-xs border-gray-700 hover:border-emerald-500 text-gray-300 gap-1.5 min-h-[36px]"
             >
               <Activity className={`h-3.5 w-3.5 ${isTesting ? 'animate-spin' : ''}`} />
-              {isTesting ? 'Testing Endpoint...' : '⚡ Test Supabase Connection'}
+              {isTesting ? 'Testing Connection...' : '⚡ Test Connection'}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncWithSupabaseDatabase()}
+              disabled={isDatabaseLoading}
+              className="text-xs border-gray-700 hover:border-emerald-500 text-emerald-400 gap-1.5 min-h-[36px]"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isDatabaseLoading ? 'animate-spin' : ''}`} />
+              {isDatabaseLoading ? 'Refreshing Data...' : 'Refresh Dataset'}
             </Button>
           </div>
 

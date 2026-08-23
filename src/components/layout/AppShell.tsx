@@ -6,7 +6,6 @@ import { MobileNav } from './MobileNav';
 import { ToastContainer } from '../common/ToastContainer';
 import { CommandPalette } from '../common/CommandPalette';
 import { PriceAlertModal } from '../modals/PriceAlertModal';
-import { ScrapeUrlModal } from '../modals/ScrapeUrlModal';
 import { useApp } from '@/src/context/AppContext';
 
 export function AppShell() {
@@ -14,8 +13,6 @@ export function AppShell() {
   const { 
     activeAlertModalProduct, 
     setActiveAlertModalProduct, 
-    isScrapeModalOpen, 
-    setIsScrapeModalOpen 
   } = useApp();
 
   return (
@@ -39,13 +36,6 @@ export function AppShell() {
         <PriceAlertModal
           product={activeAlertModalProduct}
           onClose={() => setActiveAlertModalProduct(null)}
-        />
-      )}
-
-      {isScrapeModalOpen && (
-        <ScrapeUrlModal
-          isOpen={isScrapeModalOpen}
-          onClose={() => setIsScrapeModalOpen(false)}
         />
       )}
     </div>

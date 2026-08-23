@@ -10,13 +10,13 @@ import { Product } from '../types';
 export function AdminPage() {
   const { products, adminUpdateProductPrice, adminUpdateStock, adminAddProduct, settings } = useApp();
   const [selectedProductId, setSelectedProductId] = useState<string>(products[0]?.id || '');
-  const [newPrice, setNewPrice] = useState<number>(75000);
-  const [storeName, setStoreName] = useState<string>('Amazon');
+  const [newPrice, setNewPrice] = useState<number>(399.99);
+  const [storeName, setStoreName] = useState<string>('Best Buy');
 
   // New product form
   const [newProdName, setNewProdName] = useState('');
   const [newProdBrand, setNewProdBrand] = useState('');
-  const [newProdPrice, setNewProdPrice] = useState(25000);
+  const [newProdPrice, setNewProdPrice] = useState(299.99);
   const [newProdCategory, setNewProdCategory] = useState<'pc_hardware' | 'console' | 'game' | 'accessory'>('pc_hardware');
 
   const selectedProduct = products.find(p => p.id === selectedProductId);
@@ -39,13 +39,13 @@ export function AdminPage() {
       subCategory: 'Custom Equipment',
       image: 'https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&q=80&w=600&h=600',
       currentPrice: newProdPrice,
-      originalPrice: Math.round(newProdPrice * 1.2),
+      originalPrice: Number((newProdPrice * 1.2).toFixed(2)),
       lowestPrice: newProdPrice,
       averagePrice: newProdPrice,
-      highestPrice: Math.round(newProdPrice * 1.2),
-      dealScore: 85,
+      highestPrice: Number((newProdPrice * 1.2).toFixed(2)),
+      dealScore: 88,
       stockStatus: 'In Stock',
-      store: 'Amazon',
+      store: storeName,
       updatedAt: 'Just now'
     };
 
@@ -58,22 +58,22 @@ export function AdminPage() {
     <div className="flex flex-col gap-6 max-w-5xl">
       {/* Header */}
       <div>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-rose-400 font-mono mb-1">
-          <ShieldAlert className="h-4 w-4 text-rose-500" />
-          <span>Internal Commerce Simulator</span>
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-400 font-mono mb-1">
+          <ShieldAlert className="h-4 w-4 text-emerald-500" />
+          <span>Commerce Event Simulator</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-100">
           Admin & Event Simulator Terminal
         </h1>
         <p className="text-sm text-gray-400 mt-1">
-          Test real-time drop feeds, price alerts, restock triggers, and catalog state modifications.
+          Test real-time drop feeds, price alerts, restock triggers across Best Buy, Newegg, and Steam.
         </p>
       </div>
 
       {/* Simulator Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Price & Stock Modifier */}
-        <Card className="bg-[#0D0F12] border-gray-800 p-6 space-y-4">
+        <Card className="bg-[#0B0D11] border-gray-800 p-6 space-y-4">
           <div className="flex items-center gap-2 border-b border-gray-800 pb-3">
             <Edit3 className="h-4 w-4 text-emerald-400" />
             <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider">
@@ -103,9 +103,10 @@ export function AdminPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-400 block mb-1">New Ingested Price</label>
+                <label className="text-xs text-gray-400 block mb-1">New Ingested Price ($ USD)</label>
                 <Input
                   type="number"
+                  step="0.01"
                   value={newPrice}
                   onChange={e => setNewPrice(Number(e.target.value))}
                   className="font-mono text-sm bg-[#12151A]"
@@ -119,12 +120,9 @@ export function AdminPage() {
                   onChange={e => setStoreName(e.target.value)}
                   className="w-full h-9 rounded-lg border border-gray-800 bg-[#12151A] px-3 text-xs text-gray-200"
                 >
-                  <option value="Amazon">Amazon</option>
-                  <option value="Flipkart">Flipkart</option>
-                  <option value="MDComputers">MDComputers</option>
-                  <option value="PrimeABGB">PrimeABGB</option>
+                  <option value="Best Buy">Best Buy</option>
+                  <option value="Newegg">Newegg</option>
                   <option value="Steam">Steam</option>
-                  <option value="PlayStation Store">PlayStation Store</option>
                 </select>
               </div>
             </div>
@@ -154,54 +152,70 @@ export function AdminPage() {
           </form>
         </Card>
 
+        {/* Catalog Injector */}
+        <Card className="bg-[#0B0D11] border-gray-800 p-6 space-y-4">
+          <div className="flex items-center gap-2 border-b border-gray-800 pb-3">
+            <Plus className="h-4 w-4 text-emerald-400" />
+            <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider">
+              Inject Custom Product to Catalog
+            </h3>
+          </div>
+
+          <form onSubmit={handleAddProduct} className="space-y-3">
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Product Name</label>
+              <Input
+                placeholder="e.g. RTX 4070 Ti Super 16GB"
+                value={newProdName}
+                onChange={e => setNewProdName(e.target.value)}
+                className="text-xs bg-[#12151A]"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Brand</label>
+                <Input
+                  placeholder="e.g. ASUS / MSI"
+                  value={newProdBrand}
+                  onChange={e => setNewProdBrand(e.target.value)}
+                  className="text-xs bg-[#12151A]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Price ($ USD)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={newProdPrice}
+                  onChange={e => setNewProdPrice(Number(e.target.value))}
+                  className="text-xs font-mono bg-[#12151A]"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Category</label>
+              <select
+                value={newProdCategory}
+                onChange={e => setNewProdCategory(e.target.value as any)}
+                className="w-full h-9 rounded-lg border border-gray-800 bg-[#12151A] px-3 text-xs text-gray-200"
+              >
+                <option value="pc_hardware">PC Hardware</option>
+                <option value="console">Consoles</option>
+                <option value="game">Games</option>
+                <option value="accessory">Accessories</option>
+              </select>
+            </div>
+
+            <Button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs h-9 mt-2">
+              Add Product to Catalog
+            </Button>
+          </form>
+        </Card>
       </div>
-
-      {/* Catalog Injector */}
-      <Card className="bg-[#0D0F12] border-gray-800 p-6 space-y-4">
-        <div className="flex items-center gap-2 border-b border-gray-800 pb-3">
-          <Plus className="h-4 w-4 text-blue-400" />
-          <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider">
-            Inject Custom Product to Catalog
-          </h3>
-        </div>
-
-        <form onSubmit={handleAddProduct} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Product Name</label>
-            <Input
-              placeholder="e.g. RTX 5090 Suprim X"
-              value={newProdName}
-              onChange={e => setNewProdName(e.target.value)}
-              className="text-xs bg-[#12151A]"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Brand</label>
-            <Input
-              placeholder="e.g. MSI"
-              value={newProdBrand}
-              onChange={e => setNewProdBrand(e.target.value)}
-              className="text-xs bg-[#12151A]"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Price (₹ INR)</label>
-            <Input
-              type="number"
-              value={newProdPrice}
-              onChange={e => setNewProdPrice(Number(e.target.value))}
-              className="text-xs font-mono bg-[#12151A]"
-            />
-          </div>
-
-          <Button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs h-9">
-            Add Product to DB
-          </Button>
-        </form>
-      </Card>
     </div>
   );
 }

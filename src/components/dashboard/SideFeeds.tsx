@@ -4,22 +4,24 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { useApp } from '@/src/context/AppContext';
 import { formatCurrency } from '@/src/lib/utils';
-import { Clock, ArrowRight, RefreshCcw, Tag } from 'lucide-react';
+import { ArrowRight, RefreshCcw, Tag, CheckCircle2 } from 'lucide-react';
 
 export function RestockFeed() {
   const { products, settings } = useApp();
   const restocks = products.filter(p => p.stockStatus === 'In Stock').slice(0, 4);
 
   return (
-    <Card className="flex h-full flex-col bg-[#0D0F12] border-gray-800">
-      <CardHeader className="border-b border-gray-800 pb-3 pt-4 px-4">
+    <Card className="flex h-full flex-col bg-[#0B0D11] border-gray-800/80 shadow-sm">
+      <CardHeader className="border-b border-gray-800/80 pb-3 pt-3.5 px-4 bg-[#0E1015]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <RefreshCcw className="h-4 w-4 text-blue-400" />
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-gray-200">Recent Restocks</CardTitle>
+            <RefreshCcw className="h-3.5 w-3.5 text-sky-400" />
+            <CardTitle className="text-xs font-mono font-bold uppercase tracking-wider text-gray-200">
+              Verified In-Stock
+            </CardTitle>
           </div>
-          <Link to="/restocks" className="text-[11px] text-gray-400 hover:text-blue-400 flex items-center gap-0.5 transition-colors">
-            More <ArrowRight className="h-3 w-3" />
+          <Link to="/restocks" className="text-[11px] text-gray-400 hover:text-sky-400 flex items-center gap-0.5 transition-colors font-medium">
+            View All <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
       </CardHeader>
@@ -29,15 +31,19 @@ export function RestockFeed() {
             <Link 
               to={`/product/${product.id}`} 
               key={product.id} 
-              className="flex items-center justify-between p-3.5 hover:bg-[#12151A] transition-colors block group"
+              className="flex items-center justify-between p-3.5 hover:bg-[#11141A] transition-colors block group"
             >
               <div className="min-w-0 flex-1 pr-3">
-                <h4 className="text-xs font-medium text-gray-200 line-clamp-1 group-hover:text-blue-400 transition-colors">
+                <h4 className="text-xs font-semibold text-gray-200 truncate group-hover:text-sky-400 transition-colors">
                   {product.name}
                 </h4>
                 <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-1">
-                  <Badge variant="info" className="uppercase font-mono text-[9px] py-0 px-1">IN STOCK</Badge>
-                  <span className="font-semibold text-gray-300">{product.store}</span>
+                  <span className="font-mono font-bold text-gray-300 uppercase px-1.5 py-0.5 rounded bg-gray-800 border border-gray-700/60">
+                    {product.store}
+                  </span>
+                  <span className="text-emerald-400 flex items-center gap-0.5">
+                    <CheckCircle2 className="h-2.5 w-2.5" /> In Stock
+                  </span>
                   <span className="text-gray-600">•</span>
                   <span className="text-gray-500">{product.updatedAt}</span>
                 </div>
@@ -63,15 +69,17 @@ export function TodayDeals() {
     .slice(0, 4);
 
   return (
-    <Card className="flex h-full flex-col bg-[#0D0F12] border-gray-800">
-      <CardHeader className="border-b border-gray-800 pb-3 pt-4 px-4">
+    <Card className="flex h-full flex-col bg-[#0B0D11] border-gray-800/80 shadow-sm">
+      <CardHeader className="border-b border-gray-800/80 pb-3 pt-3.5 px-4 bg-[#0E1015]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Tag className="h-4 w-4 text-emerald-400" />
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-gray-200">Top Curated Deals</CardTitle>
+            <Tag className="h-3.5 w-3.5 text-emerald-400" />
+            <CardTitle className="text-xs font-mono font-bold uppercase tracking-wider text-gray-200">
+              Curated Price Drops
+            </CardTitle>
           </div>
-          <Link to="/deals" className="text-[11px] text-gray-400 hover:text-emerald-400 flex items-center gap-0.5 transition-colors">
-            More <ArrowRight className="h-3 w-3" />
+          <Link to="/deals" className="text-[11px] text-gray-400 hover:text-emerald-400 flex items-center gap-0.5 transition-colors font-medium">
+            View All <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
       </CardHeader>
@@ -83,23 +91,27 @@ export function TodayDeals() {
               <Link 
                 to={`/product/${product.id}`} 
                 key={product.id} 
-                className="flex gap-3 p-3.5 hover:bg-[#12151A] transition-colors block group items-center"
+                className="flex gap-3 p-3 hover:bg-[#11141A] transition-colors block group items-center"
               >
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-[#171A20] p-1 border border-gray-800 flex items-center justify-center">
-                  <img src={product.image} alt={product.name} className="h-full w-full object-contain" />
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[#161920] p-1 border border-gray-800 flex items-center justify-center">
+                  <img src={product.image} alt={product.name} className="h-full w-full object-contain group-hover:scale-105 transition-transform" />
                 </div>
                 <div className="flex flex-1 flex-col justify-center min-w-0">
-                  <h4 className="text-xs font-medium text-gray-200 truncate group-hover:text-emerald-400 transition-colors">
+                  <h4 className="text-xs font-semibold text-gray-200 truncate group-hover:text-emerald-400 transition-colors">
                     {product.name}
                   </h4>
                   <div className="flex items-center gap-2 text-xs mt-0.5">
-                    <Badge variant="success" className="font-mono text-[9px] py-0 px-1">-{discount}%</Badge>
+                    <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold">
+                      -{discount}%
+                    </span>
                     <span className="font-bold text-emerald-400 font-mono text-xs">
                       {formatCurrency(product.currentPrice, settings.currency)}
                     </span>
-                    <span className="text-gray-500 line-through font-mono text-[10px]">
-                      {formatCurrency(product.originalPrice!, settings.currency)}
-                    </span>
+                    {product.originalPrice && (
+                      <span className="text-gray-500 line-through font-mono text-[10px]">
+                        {formatCurrency(product.originalPrice, settings.currency)}
+                      </span>
+                    )}
                   </div>
                 </div>
               </Link>

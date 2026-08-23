@@ -8,7 +8,6 @@ import {
   ChevronDown, 
   Menu, 
   Palette,
-  Sparkles,
   Check,
   Trash2
 } from 'lucide-react';
@@ -18,7 +17,6 @@ import { Currency, ThemeType } from '@/src/types';
 export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const { 
     setIsCommandOpen, 
-    setIsScrapeModalOpen,
     watchlist, 
     notifications, 
     markNotificationAsRead, 
@@ -90,21 +88,11 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
           className="flex items-center gap-2 sm:gap-3 rounded-lg border border-gray-800 bg-[#12151A] px-3 py-1.5 text-xs text-gray-400 hover:border-gray-700 hover:text-gray-200 transition-colors flex-1 min-w-0 text-left group min-h-[38px]"
         >
           <Search className="h-4 w-4 text-gray-500 group-hover:text-gray-300 transition-colors shrink-0" />
-          <span className="truncate hidden sm:inline">Search products, games, consoles, hardware...</span>
-          <span className="truncate sm:hidden">Search...</span>
+          <span className="truncate hidden sm:inline">Search hardware, CPUs, GPUs, Steam games, Best Buy, Newegg...</span>
+          <span className="truncate sm:hidden">Search products...</span>
           <kbd className="ml-auto hidden items-center gap-0.5 rounded border border-gray-700 bg-[#171A20] px-1.5 font-mono text-[10px] text-gray-400 sm:flex shrink-0">
             <span>⌘</span>K
           </kbd>
-        </button>
-
-        {/* Scrape URL Button */}
-        <button
-          onClick={() => setIsScrapeModalOpen(true)}
-          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50 text-xs font-semibold transition-all shrink-0 min-h-[38px]"
-          title="Scrape & Track any live product URL with Bright Data"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Scrape URL</span>
         </button>
       </div>
 

@@ -6,23 +6,23 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Exchange rates relative to INR
+// Exchange rates relative to USD (Base: USD)
 const CURRENCY_RATES: Record<Currency, { rate: number; symbol: string; locale: string }> = {
-  INR: { rate: 1, symbol: '₹', locale: 'en-IN' },
-  USD: { rate: 0.012, symbol: '$', locale: 'en-US' },
-  EUR: { rate: 0.011, symbol: '€', locale: 'de-DE' },
-  GBP: { rate: 0.0095, symbol: '£', locale: 'en-GB' },
+  USD: { rate: 1, symbol: '$', locale: 'en-US' },
+  EUR: { rate: 0.92, symbol: '€', locale: 'de-DE' },
+  GBP: { rate: 0.79, symbol: '£', locale: 'en-GB' },
+  INR: { rate: 83.5, symbol: '₹', locale: 'en-IN' },
 };
 
-export function formatCurrency(value: number, currency: Currency = 'INR'): string {
-  const config = CURRENCY_RATES[currency] || CURRENCY_RATES.INR;
+export function formatCurrency(value: number, currency: Currency = 'USD'): string {
+  const config = CURRENCY_RATES[currency] || CURRENCY_RATES.USD;
   const converted = value * config.rate;
   
   return new Intl.NumberFormat(config.locale, {
     style: 'currency',
     currency: currency,
-    maximumFractionDigits: currency === 'INR' ? 0 : 2,
-    minimumFractionDigits: currency === 'INR' ? 0 : 2,
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
   }).format(converted);
 }
 

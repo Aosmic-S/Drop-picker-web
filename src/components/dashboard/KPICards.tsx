@@ -14,77 +14,83 @@ export function KPICards() {
 
   const kpis = [
     { 
-      label: 'Price Drops', 
+      label: 'VERIFIED DROPS', 
       value: `${dropsCount}`, 
-      change: dropsCount > 0 ? `${dropsCount} verified drops` : 'Listening to feed', 
-      trend: 'up', 
+      subtext: 'Active reductions', 
       icon: TrendingDown, 
       color: 'text-emerald-400',
+      badgeBg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
       path: '/drops'
     },
     { 
-      label: 'Live Restocks', 
+      label: 'IN-STOCK ITEMS', 
       value: `${inStockCount}`, 
-      change: inStockCount > 0 ? `${inStockCount} in stock` : '0 in stock', 
-      trend: 'up', 
+      subtext: 'Ready to order', 
       icon: RefreshCcw, 
-      color: 'text-blue-400',
+      color: 'text-sky-400',
+      badgeBg: 'bg-sky-500/10 border-sky-500/20 text-sky-400',
       path: '/restocks'
     },
     { 
-      label: 'Active Deals', 
+      label: 'LIVE DEALS', 
       value: `${totalDeals}`, 
-      change: totalDeals > 0 ? `${totalDeals} discounted` : '0 active', 
-      trend: 'up', 
+      subtext: 'Below standard MSRP', 
       icon: Tag, 
-      color: 'text-emerald-500',
+      color: 'text-emerald-400',
+      badgeBg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
       path: '/deals'
     },
     { 
-      label: 'Watchlist Items', 
-      value: `${watchlist.length}`, 
-      change: `${watchlist.length} tracked`, 
-      trend: 'neutral', 
-      icon: Bookmark, 
-      color: 'text-gray-300',
-      path: '/watchlist'
-    },
-    { 
-      label: 'Tracked Products', 
+      label: 'TRACKED CATALOG', 
       value: `${products.length}`, 
-      change: `${products.length} live items`, 
-      trend: 'up', 
+      subtext: 'Hardware & Games', 
       icon: Package, 
-      color: 'text-gray-400',
+      color: 'text-gray-300',
+      badgeBg: 'bg-gray-800 text-gray-300 border-gray-700',
       path: '/pc-hardware'
     },
     { 
-      label: 'Active Alerts', 
+      label: 'WATCHLIST QUEUE', 
+      value: `${watchlist.length}`, 
+      subtext: 'Custom targets', 
+      icon: Bookmark, 
+      color: 'text-indigo-400',
+      badgeBg: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400',
+      path: '/watchlist'
+    },
+    { 
+      label: 'PRICE ALERTS', 
       value: `${activeAlertsCount}`, 
-      change: activeAlertsCount > 0 ? `${activeAlertsCount} active` : 'None active', 
-      trend: 'up', 
+      subtext: 'Listening triggers', 
       icon: BellRing, 
       color: 'text-amber-400',
+      badgeBg: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
       path: '/alerts/price'
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
       {kpis.map((kpi, idx) => (
-        <Link key={idx} to={kpi.path} className="group block">
-          <Card className="bg-[#0D0F12] border-gray-800/80 hover:border-gray-700 p-4 flex flex-col justify-between transition-colors h-full">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-medium text-gray-400 truncate">{kpi.label}</span>
-              <kpi.icon className={`h-4 w-4 ${kpi.color} opacity-80 group-hover:scale-110 transition-transform`} />
-            </div>
-            <div>
-              <div className="text-2xl font-bold font-mono tracking-tight text-gray-100">{kpi.value}</div>
-              <div className="text-[10px] font-medium font-mono text-emerald-400 mt-1">
-                {kpi.change}
+        <Link key={idx} to={kpi.path} className="group block focus:outline-none">
+          <div className="h-full rounded-xl border border-gray-800/80 bg-[#0B0D11] hover:bg-[#10131A] hover:border-gray-700 p-4 flex flex-col justify-between transition-all duration-200 shadow-sm">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <span className="text-[10px] font-mono font-bold tracking-wider text-gray-400 uppercase truncate">
+                {kpi.label}
+              </span>
+              <div className={`p-1.5 rounded-lg border ${kpi.badgeBg}`}>
+                <kpi.icon className="h-3.5 w-3.5" />
               </div>
             </div>
-          </Card>
+            <div>
+              <div className="text-2xl lg:text-3xl font-extrabold font-mono tracking-tight text-gray-100 group-hover:text-emerald-400 transition-colors">
+                {kpi.value}
+              </div>
+              <div className="text-[11px] font-medium text-gray-400 mt-1 truncate">
+                {kpi.subtext}
+              </div>
+            </div>
+          </div>
         </Link>
       ))}
     </div>

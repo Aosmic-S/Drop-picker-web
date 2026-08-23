@@ -53,7 +53,7 @@ export function ProductDetail() {
         <Package className="h-12 w-12 text-gray-600 mb-3" />
         <h2 className="text-xl font-bold text-gray-200">Product Not Found</h2>
         <p className="text-xs text-gray-400 mt-1 max-w-md">
-          This product is not currently in your active catalog. You can paste an e-commerce URL to scrape and track its pricing in real time.
+          This product is not currently in your active tracking catalog.
         </p>
         <div className="flex items-center gap-3 mt-5">
           <Link to="/">
@@ -61,13 +61,6 @@ export function ProductDetail() {
               <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Back to Dashboard
             </Button>
           </Link>
-          <Button 
-            onClick={() => setIsScrapeModalOpen(true)} 
-            size="sm" 
-            className="text-xs bg-emerald-500 hover:bg-emerald-600 text-black font-semibold"
-          >
-            <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Scrape Product URL
-          </Button>
         </div>
       </div>
     );
